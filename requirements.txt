@@ -1,0 +1,9 @@
+torch
+numpy
+transformers
+requests
+truststore
+fastapi
+uvicorn
+pydantic
+mcp

@@ -1,0 +1,38 @@
+{
+  "_readme": "Secrets go in .env (copy .env.example) and are referenced here as ${NAME}; a server whose secrets are unset is skipped. `tools` is a glob allowlist that keeps the prompt small for the 1.5B model. Setup for each server: docs/server.md.",
+  "servers": {
+    "tasks": {
+      "command": "node",
+      "args": ["mcp-servers/google-tasks/build/index.js"],
+      "env": { "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}", "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}" },
+      "tools": ["authenticate", "set-auth-code", "list-tasklists", "list-tasks", "create-task", "update-task", "complete-task", "delete-task"]
+    },
+    "keep": {
+      "command": "venv/Scripts/keep-mcp.exe",
+      "env": { "GOOGLE_EMAIL": "${GOOGLE_EMAIL}", "GOOGLE_MASTER_TOKEN": "${GOOGLE_MASTER_TOKEN}", "UNSAFE_MODE": "false" },
+      "tools": ["find", "get_note", "create_note", "create_list", "update_note", "add_list_item", "update_list_item", "pin_note", "archive_note", "trash_note"]
+    },
+    "youtube": {
+      "command": "npx",
+      "args": ["-y", "zubeid-youtube-mcp-server"],
+      "env": { "YOUTUBE_API_KEY": "${YOUTUBE_API_KEY}" },
+      "tools": ["videos_searchVideos", "videos_getVideo", "transcripts_getTranscript", "channels_searchChannels", "channels_listVideos"]
+    },
+    "google": {
+      "command": "npx",
+      "args": ["-y", "@adenot/mcp-google-search"],
+      "env": { "GOOGLE_API_KEY": "${GOOGLE_SEARCH_API_KEY}", "GOOGLE_SEARCH_ENGINE_ID": "${GOOGLE_SEARCH_ENGINE_ID}" },
+      "tools": ["search"]
+    },
+    "maps": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "env": { "GOOGLE_MAPS_API_KEY": "${GOOGLE_MAPS_API_KEY}" },
+      "tools": ["maps_search_places", "maps_place_details", "maps_directions", "maps_distance_matrix", "maps_geocode"]
+    },
+    "figma": {
+      "disabled": true,
+      "url": "http://127.0.0.1:3845/mcp"
+    }
+  }
+}
