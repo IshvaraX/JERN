@@ -1187,3 +1187,86 @@ JERN: Take your time. I'm here whenever you're ready, whether it's a question or
 ---
 User: no thanks
 JERN: No problem. I'll be here if you need anything later.
+---
+User: open github
+JERN: <tool_call>{"name": "open_website", "arguments": {"site": "github"}}</tool_call>
+Tool: opened https://github.com
+JERN: GitHub is open in your browser.
+---
+User: can you open my gmail inbox
+JERN: <tool_call>{"name": "open_website", "arguments": {"site": "gmail"}}</tool_call>
+Tool: opened https://mail.google.com/mail/u/0/#inbox
+JERN: Your Gmail inbox is open. I can't read it, but it's on your screen.
+---
+User: open news.ycombinator.com
+JERN: <tool_call>{"name": "open_website", "arguments": {"site": "news.ycombinator.com"}}</tool_call>
+Tool: opened https://news.ycombinator.com
+JERN: Hacker News is up.
+---
+User: play Shape of You on YouTube
+JERN: <tool_call>{"name": "play_youtube", "arguments": {"query": "Shape of You"}}</tool_call>
+Tool: playing Shape of You on YouTube
+JERN: Playing **Shape of You** on YouTube. Enjoy!
+---
+User: play some lofi music
+JERN: <tool_call>{"name": "play_youtube", "arguments": {"query": "lofi hip hop radio"}}</tool_call>
+Tool: opened YouTube search results for lofi hip hop radio
+JERN: I couldn't pick a single video, so I opened the YouTube results for lofi hip hop radio. Take your pick.
+---
+User: where is Bengaluru
+JERN: <tool_call>{"name": "search_location", "arguments": {"place": "Bengaluru"}}</tool_call>
+Tool: opened https://www.google.com/maps/search/Bengaluru
+JERN: Bengaluru is up on Google Maps in your browser.
+---
+User: what's the weather in Ranchi
+JERN: <tool_call>{"name": "weather", "arguments": {"city": "Ranchi"}}</tool_call>
+Tool: Ranchi: 24.5°C (feels like 25.1°C), humidity 61%, wind 2.1 m/s, scattered clouds
+JERN: It's about 24.5°C in Ranchi right now with scattered clouds, 61% humidity and a light breeze.
+---
+User: weather in Atlantis?
+JERN: <tool_call>{"name": "weather", "arguments": {"city": "Atlantis"}}</tool_call>
+Tool: error: city not found: Atlantis
+JERN: I couldn't find a city called Atlantis. Could you check the spelling or give me a nearby city?
+---
+User: how's the weather today
+JERN: <tool_call>{"name": "weather", "arguments": {"city": "Bengaluru"}}</tool_call>
+Tool: error: ValueError: OPENWEATHER_API_KEY is not set; add it to .env
+JERN: I can't check the weather yet: the OpenWeather API key is missing. Add `OPENWEATHER_API_KEY` to `.env` and ask me again.
+---
+User: email alex that the meeting moved to Monday 10 am
+JERN: <tool_call>{"name": "send_email", "arguments": {"contact": "alex", "subject": "Meeting update", "body": "The meeting is moved to Monday 10 am."}}</tool_call>
+Tool: emailed Alex (alex@example.com): Meeting update
+JERN: Done. Alex has the meeting update.
+---
+User: send an email to sam saying happy birthday
+JERN: <tool_call>{"name": "send_email", "arguments": {"contact": "sam", "subject": "Happy birthday!", "body": "Happy birthday!"}}</tool_call>
+Tool: error: ValueError: no email for 'sam'; known contacts: alex
+JERN: I don't have an email address for Sam. The only contact I know is Alex; add Sam to `data/contacts.json` and I'll send it.
+---
+User: email alex that I'll be late
+JERN: <tool_call>{"name": "send_email", "arguments": {"contact": "alex", "subject": "Running late", "body": "I'll be late today."}}</tool_call>
+Tool: denied by user
+JERN: Okay, I won't send that email.
+---
+User: close this tab
+JERN: <tool_call>{"name": "close_tab", "arguments": {}}</tool_call>
+Tool: closed the current tab
+JERN: Closed the current browser tab.
+---
+User: how many devices are on my wifi
+JERN: <tool_call>{"name": "connected_devices", "arguments": {}}</tool_call>
+Tool: 3 devices: 192.168.1.1 (a4-2b-b0-11-22-33), 192.168.1.5 (3c-22-fb-44-55-66), 192.168.1.9 (f0-18-98-77-88-99)
+JERN: I can see 3 devices on your network:
+- 192.168.1.1 (a4-2b-b0-11-22-33), probably the router
+- 192.168.1.5 (3c-22-fb-44-55-66)
+- 192.168.1.9 (f0-18-98-77-88-99)
+---
+User: shut down the computer
+JERN: <tool_call>{"name": "shutdown", "arguments": {}}</tool_call>
+Tool: shutting down in 10 seconds
+JERN: Shutting down in 10 seconds. Make sure your work is saved.
+---
+User: turn off my pc
+JERN: <tool_call>{"name": "shutdown", "arguments": {}}</tool_call>
+Tool: denied by user
+JERN: Alright, I'll leave it on.

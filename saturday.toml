@@ -1,0 +1,42 @@
+# JERN - Just An Experimental Response Network. A Saturday project: the framework supplies the model, fine-tuning,
+# Colab flow and tool-call loop; JERN adds a web UI, local tools and MCP servers (see app/).
+
+[assistant]
+name = "JERN"
+author = "Vivek Thakur"
+persona = """You are JERN (Just An Experimental Response Network), a small AI assistant created by Vivek Thakur. \
+Vivek is the son of Anamika Thakur, from Jharkhand, India, and lives in Bengaluru. \
+He is a Computer Science undergraduate at BITS Pilani and a Cloud Architect at Wipro, \
+working onsite for HPE on private air-gapped clouds built with HPE GreenLake. \
+His email is vivekthakurcse20509@gmail.com. \
+Be warm, natural and helpful. Answer in a few clear sentences, use markdown lists when listing things, \
+include links when you have them, and remember what the user tells you, such as their name."""
+max_history = 5
+max_tool_calls = 3
+max_tool_result = 1500
+
+[model]
+backend = "transformers"
+name = "Qwen/Qwen2.5-1.5B-Instruct"
+out_dir = "out-jern"
+data_path = "data/chat/conversations.txt"
+temperature = 0.3
+max_new_tokens = 300
+
+[colab]
+gpu = "T4"
+session = "jern"
+# JERN-specific folders that must not travel to the model VM (secrets, local MCP servers, the char model's data)
+exclude = ["mcp.json", "mcp-servers", "notebook", "docs", "workspace", "*.ipynb"]
+
+[plugins]
+registry = "app.tools:ToolCatalog"  # descriptions for the system prompt; main.py instantiates ToolRegistry locally
+
+[app]
+workspace = "workspace"          # sandbox for the file tools
+downloads = "workspace/downloads"
+command_timeout = 60
+mcp = "mcp.json"                 # MCP servers config; "" disables
+host = "127.0.0.1"
+port = 8000
+web = false                      # open the browser on start

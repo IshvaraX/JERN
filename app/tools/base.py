@@ -1,5 +1,6 @@
-import json
 import os
+
+from saturday.plugins import Plugin as BasePlugin
 
 from constants import DEFAULT_SHELL, SHELL_NAMES
 
@@ -20,19 +21,15 @@ class Sandbox:
         return os.path.relpath(full, self.root).replace(os.sep, '/')
 
 
-class Plugin:
+class Plugin(BasePlugin):
+    """Saturday's Plugin plus what JERN needs: a sandboxed workspace, per-OS wording, web UI display flags."""
 
-    name = ''
-    description = ''
-    parameters = {}
-    required = ()
-    confirm = False
     terminal = False  # show this tool's command and output in the web terminal
     expand = False  # show this tool's result expanded (not collapsed) under the reply
 
     def __init__(self, config):
-        self.config = config
-        self.workspace = Sandbox(config.workspace)
+        super().__init__(config)
+        self.workspace = Sandbox(config.path(config.workspace))
         self.parameters, self.description = self.template(config)
 
     @staticmethod
@@ -44,24 +41,7 @@ class Plugin:
         return cls.parameters, cls.description
 
     @classmethod
-    def describe(cls, config):
+    def describe_class(cls, config):
+        # Same text as describe() on an instance, without instantiating (tools must not run on the model VM).
         parameters, description = cls.template(config)
         return f"- {cls.name}({', '.join(parameters)}): {description}"
-
-    def summary(self, arguments):
-        return f"{self.name} {json.dumps(arguments)}"
-
-    def validate(self, arguments):
-        if not isinstance(arguments, dict):
-            raise ValueError('arguments must be an object')
-        # Small models invent argument names; keep the known ones rather than failing the whole call.
-        arguments = {key: value for key, value in arguments.items() if key in self.parameters}
-        missing = [key for key in self.required if not arguments.get(key)]
-        if missing:
-            raise ValueError(f"missing arguments: {', '.join(missing)}")
-        if not all(isinstance(value, str) for value in arguments.values()):
-            raise ValueError('arguments must be strings')
-        return arguments
-
-    def run(self, **arguments):
-        raise NotImplementedError

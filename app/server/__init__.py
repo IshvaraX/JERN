@@ -1,4 +1,4 @@
 from app.server.api import ChatServer
-from app.server.assistant import AppConfig, Assistant, EventLog
+from app.server.assistant import Assistant, EventLog, Session
 
-__all__ = ['AppConfig', 'Assistant', 'ChatServer', 'EventLog']
+__all__ = ['Assistant', 'ChatServer', 'EventLog', 'Session']

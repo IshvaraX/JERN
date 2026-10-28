@@ -1,86 +1,18 @@
-import json
+﻿"""JERN's assistant: Saturday's tool-call loop plus what the web UI needs (a per-turn timeline, terminal sessions,
+command rewriting for the small model) and an event log the browser polls."""
 import os
-import platform
 import re
 import threading
 import time
-import uuid
 from collections import deque
-from dataclasses import dataclass
 
-from constants import DOWNLOADS_DIR, HOST, MCP_CONFIG, MODEL_PORT, PERSONA, PORT, TOOL_PROMPT, WORKSPACE_DIR
-from model.jern.chat import ChatConfig, chat_backend
-
-
-@dataclass
-class AppConfig(ChatConfig):
-    max_history: int = 5
-    max_tool_calls: int = 3
-    max_tool_result: int = 1500
-    workspace: str = WORKSPACE_DIR
-    downloads: str = DOWNLOADS_DIR
-    command_timeout: int = 60
-    mcp: str = MCP_CONFIG  # MCP servers config; '' disables
-    system_prompt: str = PERSONA
-    platform: str = ''  # OS the tools run on; defaults to this machine (set when fine-tuning elsewhere)
-    host: str = HOST
-    port: int = PORT
-    model_port: int = MODEL_PORT
-    web: bool = False
-
-    def platform_name(self):
-        return self.platform or f"{platform.system()} {platform.release()}"
-
-
-class ToolCall:
-
-    PATTERN = re.compile(r'<tool_call>\s*(\{.*?\})\s*(?:</tool_call>|$)', re.DOTALL)
-    NAME_KEYS = ('name', 'tool', 'function', 'tool_name')
-    ARGUMENT_KEYS = ('arguments', 'parameters', 'params', 'args', 'input')
-
-    def __init__(self, name, arguments, error=None):
-        self.id = uuid.uuid4().hex
-        self.name = name
-        self.arguments = arguments
-        self.error = error
-
-    @property
-    def raw(self):
-        return f'<tool_call>{json.dumps({"name": self.name, "arguments": self.arguments})}</tool_call>'
-
-    @staticmethod
-    def loads(text):
-        # Small models write Windows paths with single backslashes ("D:\"), which is invalid JSON escaping.
-        for candidate in (text, text.replace('\\', '\\\\'), re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)):
-            try:
-                return json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-        raise ValueError(f"malformed tool call: {text[:200]}")
-
-    @classmethod
-    def parse(cls, text):
-        match = cls.PATTERN.search(text)
-        if not match:
-            return None
-        try:
-            data = cls.loads(match.group(1))
-            if not isinstance(data, dict):
-                raise ValueError('tool call must be an object')
-            name = next((data[key] for key in cls.NAME_KEYS if isinstance(data.get(key), str)), None)
-            arguments = next((data[key] for key in cls.ARGUMENT_KEYS if isinstance(data.get(key), dict)), None)
-            if name is None and len(data) == 1:
-                # shorthand like {"list_files": {"path": "D:/"}}
-                name, value = next(iter(data.items()))
-                arguments = value if isinstance(value, dict) else None
-            if arguments is None:
-                arguments = {k: v for k, v in data.items() if k not in cls.NAME_KEYS + cls.ARGUMENT_KEYS}
-            return cls(str(name or ''), arguments)
-        except ValueError as error:
-            return cls('', {}, error=str(error))
+from saturday.assistant import Assistant as BaseAssistant
+from saturday.assistant import Session as BaseSession
+from saturday.assistant import ToolCall
 
 
 class EventLog:
+    """Ring buffer of log lines for the UI; callable so Saturday can use it as its `log(kind, text)`."""
 
     def __init__(self, limit=500):
         self.entries = deque(maxlen=limit)
@@ -94,81 +26,51 @@ class EventLog:
             self.entries.append({'id': self.counter, 'time': time.strftime('%H:%M:%S'), 'kind': kind, 'text': text})
         print(f"[{kind}] {text}", flush=True)
 
+    __call__ = add
+
     def since(self, after):
         with self.lock:
             return [entry for entry in self.entries if entry['id'] > after]
 
 
-class Session:
+class Session(BaseSession):
 
     def __init__(self, session_id):
-        self.id = session_id
-        self.history = []
-        self.pending = None
+        super().__init__(user=None, session_id=session_id)
         self.steps = []  # what happened during the current turn, shown as a timeline in the UI
 
-    def add(self, role, content):
-        self.history.append({'role': role, 'content': content})
-
-    def trim(self, max_turns):
-        starts = [i for i, m in enumerate(self.history) if m['role'] == 'user']
-        if len(starts) > max_turns:
-            del self.history[:starts[-max_turns]]
+    def begin(self):
+        self.steps = []
 
 
-class Assistant:
+class Assistant(BaseAssistant):
 
-    TOOL_PROMPT = TOOL_PROMPT
-
-    def __init__(self, config, plugins, log):
-        self.config = config
-        self.plugins = plugins
-        self.log = log
-        self.lock = threading.Lock()
-        self.chat = self.load_chat(config, plugins, log)
-        self.log.add('info', f"model ready ({self.chat.source}) with tools: {', '.join(p.name for p in plugins)}")
-
-    @classmethod
-    def build_system_prompt(cls, config, plugins):
-        prompt = cls.TOOL_PROMPT.replace('{tools}', plugins.describe()).replace('{platform}', config.platform_name())
-        return f"{config.system_prompt}\n{prompt}"
-
-    @classmethod
-    def load_chat(cls, config, plugins, log):
-        return chat_backend(config, log.add).load(cls.build_system_prompt(config, plugins))
-
-    def system_prompt(self):
-        return self.build_system_prompt(self.config, self.plugins)
-
-    def generate(self, history):
-        return self.chat.generate([{'role': 'system', 'content': self.system_prompt()}] + history)
-
-    def respond(self, session, message):
-        with self.lock:
-            session.steps = []
-            self.log.add('user', message)
-            if session.pending is not None:
-                session.pending = None
-                self.record(session, 'denied by user')
-            session.add('user', message)
-            session.trim(self.config.max_history)
-            return self.step(session)
-
-    def resume(self, session, allow):
-        with self.lock:
-            session.steps = []
-            call, session.pending = session.pending, None
-            self.log.add('user', f"{'allowed' if allow else 'denied'}: {call.name}")
-            if allow:
-                self.execute(session, self.plugins.get(call.name), call)
-            else:
-                self.record(session, 'denied by user')
-            return self.step(session)
+    GIVE_UP = 'I could not complete that. Could you try again?'
 
     # Shell commands the small model reaches for when asked about the computer; served via os/sys instead.
     SYSTEM_COMMANDS = {'systeminfo', 'hostname', 'ver', 'winver', 'uname', 'whoami', 'wmic', 'lsb_release', 'sw_vers'}
     SYSTEM_WORDS = re.compile(r'\b(os|hostname|computername|username|version|platform|system)\b', re.IGNORECASE)
     LIST_COMMANDS = {'dir', 'ls', 'tree'}
+
+    def give_up(self, session):
+        return self.GIVE_UP
+
+    def confirm_question(self, session, plugin, call):
+        return f"I would like to {plugin.summary(call.arguments)}. Allow?"
+
+    def run_arguments(self, session, plugin):
+        return {'session_id': session.id} if plugin.terminal else {}
+
+    def note(self, session, kind, plugin, call, result=None):
+        if kind == 'error':
+            session.steps.append({'kind': 'error', 'name': call.name, 'summary': f"Tool call failed: {result}"})
+            return
+        session.steps.append({
+            'kind': 'command' if plugin.terminal else 'tool', 'name': plugin.name,
+            'summary': plugin.summary(call.arguments), 'command': call.arguments.get('command'),
+            'result': result, 'expand': plugin.expand,
+            'cwd': plugin.cwd(session.id) if plugin.terminal else None,
+        })
 
     def rewrite(self, session, call):
         # Shell commands that only query the system are redirected to the Python-native tools.
@@ -198,57 +100,7 @@ class Assistant:
         if target is None or target[0] not in self.plugins.plugins:
             return call
         rewritten = ToolCall(*target)
-        self.log.add('tool', f"rewrote {call.raw} -> {rewritten.raw}")
+        self.log('tool', f"rewrote {call.raw} -> {rewritten.raw}")
         session.steps.append({'kind': 'note', 'name': rewritten.name,
                               'summary': f"Used {rewritten.name.replace('_', ' ')} instead of running `{' '.join(words)}`"})
         return rewritten
-
-    def step(self, session):
-        for _ in range(self.config.max_tool_calls):
-            answer = self.generate(session.history)
-            call = ToolCall.parse(answer)
-            if call is None:
-                session.add('assistant', answer)
-                self.log.add('ai', answer)
-                return answer, None
-            call = self.rewrite(session, call)
-            session.add('assistant', call.raw)
-            self.log.add('tool', f"call {call.raw}")
-            try:
-                if call.error:
-                    raise ValueError(call.error)
-                plugin = self.plugins.get(call.name)
-                call.arguments = plugin.validate(call.arguments)
-            except ValueError as error:
-                self.log.add('error', f"{error} | model wrote: {answer[:300]}")
-                session.steps.append({'kind': 'error', 'name': call.name, 'summary': f"Tool call failed: {error}"})
-                self.record(session, f"error: {error}")
-                continue
-            if plugin.confirm:
-                session.pending = call
-                self.log.add('wait', f"waiting for permission: {plugin.summary(call.arguments)}")
-                return f"I would like to {plugin.summary(call.arguments)}. Allow?", call
-            self.execute(session, plugin, call)
-        answer = 'I could not complete that. Could you try again?'
-        session.add('assistant', answer)
-        self.log.add('error', f"gave up after {self.config.max_tool_calls} tool calls")
-        return answer, None
-
-    def execute(self, session, plugin, call):
-        self.log.add('tool', f"running {plugin.summary(call.arguments)}")
-        try:
-            extra = {'session_id': session.id} if plugin.terminal else {}
-            result = plugin.run(**call.arguments, **extra)
-        except Exception as error:
-            result = f"error: {type(error).__name__}: {str(error)[:200]}"
-        self.log.add('error' if result.startswith('error:') else 'tool', f"result: {result}")
-        session.steps.append({
-            'kind': 'command' if plugin.terminal else 'tool', 'name': plugin.name,
-            'summary': plugin.summary(call.arguments), 'command': call.arguments.get('command'),
-            'result': result, 'expand': plugin.expand,
-            'cwd': plugin.cwd(session.id) if plugin.terminal else None,
-        })
-        self.record(session, result)
-
-    def record(self, session, result):
-        session.add('tool', result[:self.config.max_tool_result])

@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.server.assistant import Session
-from constants import INDEX_FILE, MAX_SESSIONS, NAME, UI_DIR
+from constants import INDEX_FILE, MAX_SESSIONS, UI_DIR
 from model.jern.util import wait_for_port
 
 
@@ -43,14 +43,6 @@ class ChatResponse(BaseModel):
     steps: list[Step] = []  # what the assistant did during this turn, in order
 
 
-class GenerateRequest(BaseModel):
-    messages: list[dict] = Field(min_length=1, max_length=200)
-
-
-class GenerateResponse(BaseModel):
-    text: str
-
-
 class Server:
 
     def __init__(self, title):
@@ -81,30 +73,13 @@ class Server:
         pass
 
 
-class ModelServer(Server):
-
-    def __init__(self, chat, log):
-        super().__init__(f'{NAME} model')
-        self.chat = chat
-        self.log = log
-        self.lock = threading.Lock()
-        self.app.post('/generate', response_model=GenerateResponse)(self.generate)
-
-    def banner(self, host, port):
-        return f"model server ({self.chat.source}): POST http://{host}:{port}/generate   {super().banner(host, port)}"
-
-    def generate(self, request: GenerateRequest):
-        with self.lock:
-            return GenerateResponse(text=self.chat.generate(request.messages))
-
-
 class ChatServer(Server):
 
     MAX_SESSIONS = MAX_SESSIONS
     INDEX = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), UI_DIR, INDEX_FILE)
 
     def __init__(self, assistant, log):
-        super().__init__(NAME)
+        super().__init__(assistant.config.name)
         self.assistant = assistant
         self.log = log
         self.sessions = {}
