@@ -14,7 +14,6 @@ ENV_VAR = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}')
 
 
 def attr(obj, *names, default=None):
-    # mcp 1.x uses camelCase (inputSchema), 2.x snake_case (input_schema).
     for name in names:
         value = getattr(obj, name, None)
         if value is not None:
@@ -23,7 +22,6 @@ def attr(obj, *names, default=None):
 
 
 def dotenv(path):
-    # KEY=VALUE lines; keeps API keys out of mcp.json. Real environment variables win.
     values = {}
     if os.path.exists(path):
         with open(path, encoding='utf-8') as f:
@@ -36,7 +34,6 @@ def dotenv(path):
 
 
 def expand(value, env, missing):
-    # "${FIGMA_API_KEY}" inside args/env/headers/url is replaced from the environment.
     if isinstance(value, str):
         def sub(match):
             if match.group(1) not in env:
@@ -66,7 +63,7 @@ def load_servers(path):
             print(f"mcp: {name}: skipped, set {', '.join(sorted(missing))} in {ENV_FILE} or the environment")
             continue
         if 'command' in spec:
-            spec['command'] = shutil.which(spec['command']) or spec['command']  # npx -> npx.cmd on Windows
+            spec['command'] = shutil.which(spec['command']) or spec['command']
         servers[name] = spec
     return servers
 
@@ -79,7 +76,6 @@ def allowed(spec, tool_name):
 
 
 class McpClient:
-    # One background event loop; every server session lives on it for the life of the process.
 
     def __init__(self, servers):
         self.loop = asyncio.new_event_loop()
@@ -93,8 +89,8 @@ class McpClient:
                 tools = [t for t in future.result(MCP_CONNECT_TIMEOUT) if allowed(spec, t.name)]
                 self.tools[name] = tools
                 print(f"mcp: {name}: {len(tools)} tools")
-            except Exception as error:  # a server that is down should not take the assistant down
-                while isinstance(error, BaseExceptionGroup) and error.exceptions:  # unwrap anyio TaskGroup noise
+            except Exception as error:
+                while isinstance(error, BaseExceptionGroup) and error.exceptions:
                     error = error.exceptions[0]
                 print(f"mcp: {name}: unavailable ({type(error).__name__}: {str(error)[:200]})")
 
@@ -110,11 +106,11 @@ class McpClient:
 
     @staticmethod
     def http_transport(spec):
-        try:  # mcp 2.x
+        try:
             from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
             client = create_mcp_http_client(headers=spec.get('headers')) if spec.get('headers') else None
             return streamable_http_client(spec['url'], http_client=client)
-        except ImportError:  # mcp 1.x
+        except ImportError:
             from mcp.client.streamable_http import streamablehttp_client
             return streamablehttp_client(spec['url'], headers=spec.get('headers'))
 
@@ -173,7 +169,6 @@ class McpTool(Plugin):
         return arguments
 
     def coerce(self, key, value):
-        # The model writes strings; MCP schemas may want numbers, booleans or JSON objects.
         kind = self.schema.get(key, {}).get('type')
         if not isinstance(value, str):
             return value
@@ -243,7 +238,6 @@ def mcp_tools(path):
     servers = load_servers(path)
     if not servers:
         return None, []
-    # Some servers print a startup banner to stdout; the SDK logs a traceback per line and carries on.
     logging.getLogger('mcp.client.stdio').setLevel(logging.CRITICAL)
     client = McpClient(servers)
     return client, list(tool_classes(client))

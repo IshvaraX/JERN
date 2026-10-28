@@ -1,6 +1,8 @@
 # JERN — Just An Experimental Response Network
 
-**A small personal assistant with a cloud-GPU brain and local hands.** The language model can run on a free Google Colab GPU, while the tools (files, shell, web search, MCP servers) always run on your own machine.
+**A small personal assistant with a cloud-GPU brain and local hands.** The language model can run on a free Google Colab GPU, while the tools (files, shell, browser, mail, weather, MCP servers) always run on your own machine.
+
+JERN is built on [Saturday](https://github.com/vivek09thakur/SATURDAY), a framework for assistants on small language models: Saturday supplies the model backends, LoRA fine-tuning, the Colab flow and the tool-call loop; JERN adds the web UI, its tools and MCP integration.
 
 ![JERN demo](docs/demo.gif)
 
@@ -12,9 +14,9 @@ JERN is a small personal AI assistant by Vivek Thakur. It has two models and one
 
 | Part | What it is | Where |
 |---|---|---|
-| **Chat model** | `Qwen/Qwen2.5-1.5B-Instruct` fine-tuned on `data/chat/conversations.txt` so it answers as JERN and knows how to call tools | `model/jern/chat.py` |
+| **Chat model** | `Qwen/Qwen2.5-1.5B-Instruct` with a LoRA adapter trained on `data/chat/conversations.txt`, so it answers as JERN and knows how to call tools | Saturday (`saturday.models`), configured in `saturday.toml` |
 | **Char model** | A from-scratch GPT-style transformer trained character-by-character on the same file (an experiment, not the assistant) | `model/jern/network.py`, `train.py`, `sample.py` |
-| **App** | FastAPI server + web UI + tool plugins (files, shell, web search, downloads, system info) + any MCP servers you configure (Figma, GitHub, …) | `app/server/`, `app/tools/`, `app/ui/` |
+| **App** | FastAPI server + web UI + tool plugins (files, shell, web search, downloads, system info, browser, YouTube, maps, weather, email, shutdown, Wi-Fi scan) + any MCP servers you configure | `app/server/`, `app/tools/`, `app/ui/` |
 
 The model can run on this machine or on a Google Colab GPU; the tools **always run on this machine**, so JERN can read your files and run your commands even when the model is in the cloud.
 
@@ -36,12 +38,15 @@ Tools execute locally, but when the model runs on Colab, **everything the model 
 ```powershell
 python -m venv venv; .\venv\Scripts\activate
 pip install -r requirements.txt
+copy .env.example .env                  # HF_REPO/HF_TOKEN keep the trained adapter; tool and MCP keys are optional
 
-python main.py                          # web UI at http://127.0.0.1:8000 (fine-tunes on first run)
-python main.py colab --gpu=T4 -- serve  # same UI, but the model runs on a Colab T4
+python main.py                          # web UI at http://127.0.0.1:8000, model on a Colab T4 through an SSH tunnel
+python main.py serve --local            # everything on this machine (needs a GPU for comfort)
 ```
 
-The first run downloads the base model and fine-tunes it (minutes on a GPU, an hour or more on CPU). The result is saved in `out-jern/` and reused afterwards.
+The first run trains the LoRA adapter on `data/chat/conversations.txt` (about ten minutes on a T4) and pushes it to
+`HF_REPO` if set, so later runs skip training. Any setting in `saturday.toml` can be overridden on the command line:
+`python main.py --temperature=0.5 --port=8080`.
 
 ## Limitations
 
@@ -53,21 +58,21 @@ The first run downloads the base model and fine-tunes it (minutes on a GPU, an h
 
 ```
 main.py                 single entry point (see docs/cli.md)
-constants.py            every fixed value: names, paths, prompts, ports
+saturday.toml           identity, persona, model, Colab, tool registry and app settings (Saturday's project file)
+constants.py            fixed values that are not settings: paths, site list, MCP timeouts, char-model files
 requirements.txt
 app/
-  server/api.py         FastAPI servers: ChatServer (UI + tools) and ModelServer (/generate)
-  server/assistant.py   AppConfig, Assistant (tool-call loop), Session, EventLog
+  server/api.py         FastAPI ChatServer (UI + tools); the model server comes from saturday.models.server
+  server/assistant.py   Assistant (Saturday's loop + command rewriting, timeline, terminal sessions), EventLog
   tools/                one file per tool; ToolRegistry (live, local only) and ToolCatalog (descriptions)
   ui/index.html         the web UI (single file, no build step)
 model/jern/
-  chat.py               ChatConfig, JERNChat (local HF model), RemoteChat (HTTP), chat_backend()
-  data.py               conversation file parser, datasets, char-level preparer
+  data.py               char-level dataset preparer
   network.py            JERN transformer, Checkpoint
   train.py / sample.py  char-level training and sampling
-  colab.py              run any command on a Colab GPU via the colab CLI
-  config.py / util.py   Configurator, seeding, port/zip helpers
+  config.py / util.py   Configurator, seeding, port helpers (char model and UI)
 data/chat/              conversations.txt (training data) + prepare.py
+data/contacts.json      (gitignored) people the send_email tool can write to; see contacts.example.json
 notebook/               Colab notebook that runs the same pipeline interactively
 docs/                   this documentation
 export/                 (gitignored) artifacts downloaded from Colab

@@ -3,8 +3,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
-os.chdir(ROOT)  # all default paths (data/, out-*/, workspace/) are relative to the repo root
-os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')  # less fragmentation when fine-tuning
+os.chdir(ROOT)
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')
 
 from constants import FULL_NAME, NAME  # noqa: E402
 
@@ -32,8 +32,8 @@ def saturday_config(argv):
     from saturday.config import configure
     from saturday.utils import load_env
 
-    truststore.inject_into_ssl()  # trust the OS certificate store (needed behind corporate TLS proxies)
-    load_env()  # .env: HF_REPO/HF_TOKEN, OPENWEATHER_API_KEY, SMTP_*
+    truststore.inject_into_ssl()
+    load_env()
     return configure(argv, ROOT)
 
 
@@ -42,13 +42,12 @@ def serve(argv):
     if config.runs_remote():
         from saturday.colab import ColabRunner
 
-        # Model on the VM; the web UI, tools and MCP servers stay here and reach it through the SSH tunnel.
         return ColabRunner(config, ROOT).serve(argv, [sys.executable, 'main.py', 'serve', *argv])
     from app.server.api import ChatServer
     from app.server.assistant import Assistant, EventLog
     from app.tools import ToolRegistry
 
-    tools = ToolRegistry(config)  # the only place tools are instantiated: always this machine
+    tools = ToolRegistry(config)
     print(f"tools: {', '.join(p.name for p in tools)}")
     log = EventLog()
     ChatServer(Assistant(config, tools, log), log).run(config.host, config.port, config.web)

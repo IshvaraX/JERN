@@ -45,27 +45,28 @@ Sessions live in memory (`Session`: history, pending tool call, steps of the cur
 
 ## The assistant loop (`app/server/assistant.py`)
 
-`Assistant.respond(session, message)`:
+`Assistant` subclasses `saturday.assistant.Assistant`, which owns the loop; JERN overrides its hooks (`rewrite`,
+`run_arguments`, `note`, `confirm_question`, `give_up`). `respond(session, message)`:
 
 1. Append the user message, trim history to `max_history` user turns.
-2. Build the system prompt: `PERSONA` + `TOOL_PROMPT` with the plugin list and the OS name (`AppConfig.platform_name()`).
+2. Build the system prompt: the persona from `saturday.toml` + Saturday's tool prompt with the plugin list and the OS name (`config.platform_name()`), plus a context line with the current time.
 3. Generate. If the reply contains no `<tool_call>`, return it.
 4. Otherwise parse the call (`ToolCall.parse`, tolerant of single-backslash Windows paths and a few alternative key names), rewrite shell commands that only query the system to the native tools (`rewrite`), validate arguments against the plugin's parameter list.
 5. If the plugin requires confirmation, stash it as `session.pending` and return a question with an `action_id`; `resume(session, allow)` continues after `/confirm`.
-6. Else run it, append the result as a `tool` message (truncated to `max_tool_result`), and loop — at most `max_tool_calls` times per turn.
+6. Else run it (`run_arguments` adds the session id for terminal tools), append the result as a `tool` message (truncated to `max_tool_result`), and loop — at most `max_tool_calls` times per turn.
 
-Each step is recorded in `session.steps`, which the UI renders as the activity timeline and the docked terminal.
+`note` records each step in `session.steps`, which the UI renders as the activity timeline and the docked terminal.
 
-`Assistant.build_system_prompt(config, plugins)` is also used when fine-tuning so the training data carries the exact prompt the model will see at run time. `--platform` lets a Colab VM build it for the user's OS.
+`saturday.assistant.build_system_prompt(config, plugins)` is also used when fine-tuning so the training data carries the exact prompt the model will see at run time. `--platform` lets a Colab VM build it for the user's OS.
 
 ## Tools (`app/tools/`)
 
-Tools live in their own package, deliberately outside `app/server`, because they touch the user's machine: files, shell, network. Two views of the package:
+Tools live in their own package, deliberately outside `app/server`, because they touch the user's machine: files, shell, network. Two views of the package, both satisfying Saturday's registry protocol (`describe()`, `get(name)`, iteration):
 
 - **`ToolRegistry(config)`** — live instances (sandbox directories, persistent shells). Created only by `serve`, i.e. only on the user's machine.
-- **`ToolCatalog(config)`** — the tool classes and their descriptions, nothing instantiated. Used by `model` and `finetune` to build the system prompt, so a Colab VM can fine-tune with the exact tool list without ever being able to run a tool.
+- **`ToolCatalog(config)`** — the tool classes and their descriptions, nothing instantiated. `saturday.toml` names it as the registry (`[plugins] registry = "app.tools:ToolCatalog"`), so `model` and `finetune` — and the Colab VM — build the system prompt with the exact tool list without ever being able to run a tool.
 
-A tool is a class with class attributes and a `run` method; both views discover every `Plugin` subclass in the package automatically.
+A tool is a class with class attributes and a `run` method; both views discover every `Plugin` subclass in the package automatically. `app.tools.base.Plugin` extends `saturday.plugins.Plugin` with the workspace sandbox and the UI flags.
 
 ```python
 from app.tools.base import Plugin
@@ -101,6 +102,16 @@ Built-in tools:
 | `fetch_web` | | readable text of a page (3000 chars) |
 | `download` | yes | save an http(s) URL into `--downloads` (50 MB max) |
 | `system_info` | | OS, hostname, user, CPU, drives, Python |
+| `open_website` | | open a known site name, domain or URL in the browser |
+| `play_youtube` | | play the first YouTube match for a song or video |
+| `search_location` | | show a place on Google Maps |
+| `weather` | | current weather for a city (`OPENWEATHER_API_KEY` in `.env`) |
+| `send_email` | yes | email a contact from `data/contacts.json` over SMTP (`SMTP_*` in `.env`) |
+| `close_tab` | | close the current browser tab |
+| `shutdown` | yes | shut the computer down |
+| `connected_devices` | | devices on the local network from the ARP cache |
+
+The last eight were Saturday's automation and moved here when Saturday became a framework.
 
 ## MCP servers as tools (`app/tools/mcp.py`)
 

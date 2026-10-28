@@ -20,7 +20,7 @@ class ListFiles(Plugin):
         if os.name == 'nt' and drive and os.path.exists(root := f"{drive[1].upper()}:\\"):
             try:
                 if not os.path.isdir(self.workspace.resolve(path)):
-                    return root  # "d", "D:" or "d drive" mean the drive, not a workspace folder
+                    return root
             except ValueError:
                 return root
         if os.path.isabs(path):

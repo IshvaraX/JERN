@@ -24,7 +24,6 @@ class Shell:
 
     def start(self):
         if WINDOWS:
-            # /Q: do not echo commands. A newline-only prompt keeps prompt text out of the output.
             args = ['cmd.exe', '/Q', '/K', 'prompt $_']
         else:
             args = ['/bin/sh']
@@ -44,7 +43,7 @@ class Shell:
                 self.lines.append(line.rstrip('\r\n'))
                 self.condition.notify_all()
         with self.condition:
-            self.lines.append(None)  # EOF marker
+            self.lines.append(None)
             self.condition.notify_all()
 
     @property
@@ -58,10 +57,9 @@ class Shell:
             if not self.alive:
                 self.start()
             if WINDOWS:
-                command = self.CD.sub(r'\1 /d ', command)  # cmd needs /d to change drive and directory together
+                command = self.CD.sub(r'\1 /d ', command)
             marker = f'__jern_{uuid.uuid4().hex}__'
             if WINDOWS:
-                # Echo the sentinel with the exit code and current directory once the command has finished.
                 script = f'{command}\r\n@echo {marker} %ERRORLEVEL% %CD%\r\n'
             else:
                 script = f'{command}\necho "{marker} $? $(pwd)"\n'
@@ -98,7 +96,7 @@ class Shell:
                 return output, 1, None
             if marker in line:
                 if 'echo' in line.split(marker)[0]:
-                    continue  # the sentinel command itself echoed back, not its result
+                    continue
                 _, _, rest = line.partition(marker)
                 code, _, cwd = rest.strip().partition(' ')
                 return output, code or '?', cwd.strip() or None

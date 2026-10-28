@@ -3,40 +3,37 @@
 Two ways to use a Colab GPU:
 
 1. **The notebook** `notebook/Just-An-Experimental-Response-Network.ipynb` — open it in Colab, set `REPO_URL` (or upload a zip when prompted) and run the cells. Good for exploring.
-2. **The `colab` command** — drives the official [`google-colab-cli`](https://github.com/googlecolab/google-colab-cli) from your terminal, so nothing has to be clicked. This page is about that.
+2. **Saturday's Colab runner** — `serve` and `finetune` go to Colab by default, driving the official [`google-colab-cli`](https://github.com/googlecolab/google-colab-cli) from your terminal so nothing has to be clicked. This page is about that.
 
 ## Setup
 
 ```powershell
-pip install google-colab-cli
-colab sessions          # first call opens the Google sign-in flow
+colab sessions          # installed with saturday-ai; the first call opens the Google sign-in flow
 ```
 
-For `colab -- serve` you also need an OpenSSH client (`ssh`, built into Windows 10+/macOS/Linux). JERN creates an `ed25519` key in `~/.ssh` if none exists — Colab's SSH endpoint accepts only ed25519/ecdsa keys.
+For `serve` you also need an OpenSSH client (`ssh`, built into Windows 10+/macOS/Linux). Saturday creates an `ed25519` key in `~/.ssh` if none exists — Colab's SSH endpoint accepts only ed25519/ecdsa keys. Set `HF_REPO` and `HF_TOKEN` in `.env` so the trained adapter is pushed to the Hub and later runs skip training.
 
-## Batch jobs: `train`, `finetune`
+## Batch jobs: `finetune`, `train --colab`
 
 ```powershell
-python main.py colab --gpu=T4 -- train --max_iters=5000 --lr_decay_iters=5000
-python main.py colab --gpu=T4 -- finetune --epochs=3
+python main.py finetune --epochs=3
+python main.py train --colab --max_iters=5000 --lr_decay_iters=5000
 ```
 
-What happens (`model/jern/colab.py`, `ColabRunner.run`):
+What happens (`saturday.colab.ColabRunner`):
 
-1. The repo is zipped to `export/jern.zip` (excluding `venv`, `.git`, `out-*`, `export`, data binaries, …).
-2. Every other Colab session is stopped (`--stop_others`, on by default — the free tier allows one), then `colab new -s jern --gpu T4` provisions the VM; `colab upload` sends the zip.
-3. `colab exec` runs a small Python script on the VM: remove leftovers from earlier runs, unzip, `pip install -r requirements.txt`, run `main.py <command>` streaming its output, then zip the output directory. The script prints a sentinel on success; without it the run is treated as failed (IPython swallows exit codes).
-4. `colab download` fetches it into `export/<out_dir>/` (`export/out-jern-char/` for `train`, `export/out-jern/` for `finetune`).
+1. The repo is zipped to `export/saturday-upload.zip` under `project/`, with the installed `saturday` package alongside under `saturday/` so the VM runs exactly the framework version you have. `venv`, `.git`, `out-*`, `export`, `workspace`, data binaries and the `[colab] exclude` list from `saturday.toml` (`mcp.json`, `mcp-servers`, `notebook`, `docs`) stay home.
+2. Every other Colab session is stopped (the free tier allows one), then `colab new -s jern --gpu T4` provisions the VM; `colab upload` sends the zip.
+3. `colab exec` runs a small Python script on the VM: unzip, `pip install transformers peft huggingface_hub`, run the command (`python -m saturday finetune --local --platform="<your OS>"`, or `main.py train` for the char model) streaming its output. The script prints a sentinel on success; without it the run is treated as failed (IPython swallows exit codes).
+4. `finetune` pushes the adapter to `HF_REPO` when set, otherwise `colab download` fetches `out-jern/`; `train --colab` always downloads `out-jern-char/`.
 5. `colab stop` releases the VM (skip with `--keep`).
 
-Use the result locally: `python main.py serve --out_dir=export/out-jern` or `python main.py sample --out_dir=export/out-jern-char`.
-
-Rough timings on a T4: provisioning ~1 min, install ~1 min, `train` with defaults 1–2 min, `finetune` of the 1.5B model ~10–15 min (the first run also downloads ~3 GB of weights).
+Rough timings on a T4: provisioning ~1 min, install ~1 min, `train` with defaults 1–2 min, LoRA `finetune` of the 1.5B model ~5 min (the first run also downloads ~3 GB of weights).
 
 ## Interactive: `serve`
 
 ```powershell
-python main.py colab --gpu=T4 -- serve
+python main.py                 # same as: python main.py serve
 ```
 
 The model runs on the GPU; **the assistant, every tool and the UI run on your machine**. Tools therefore see your files, your shell and your OS, not the VM's.
@@ -44,8 +41,8 @@ The model runs on the GPU; **the assistant, every tool and the UI run on your ma
 ```
  your machine                                   Colab VM
  ┌──────────────────────────────┐              ┌──────────────────────────┐
- │ browser → ChatServer :8000   │              │ ModelServer :8001        │
- │           Assistant + tools  │  ssh -L 8001 │   JERNChat (Qwen, GPU)   │
+ │ browser → ChatServer :8000   │              │ saturday model :8001     │
+ │           Assistant + tools  │  ssh -L 8001 │   Qwen + LoRA (GPU)      │
  │           RemoteChat ────────┼──────────────┼─→ POST /generate         │
  └──────────────────────────────┘              └──────────────────────────┘
 ```
@@ -53,18 +50,16 @@ The model runs on the GPU; **the assistant, every tool and the UI run on your ma
 Steps (`ColabRunner.serve`):
 
 1. Zip, provision, upload as above.
-2. On the VM: `main.py model --model_port=8001 --platform="<your OS>"` is started detached; its log is streamed until `/health` answers (this includes the fine-tune on the first run). `--platform` makes the tool prompt baked into fine-tuning describe *your* OS, not Linux.
+2. On the VM: `python -m saturday model --local --platform="<your OS>"` is started detached; its log is streamed until `/health` answers (this includes the fine-tune on the first run). `--platform` makes the tool prompt baked into fine-tuning describe *your* OS, not Linux.
 3. Locally: `ssh -N -L 8001:127.0.0.1:8001` with `colab ssh --proxy-mode` as the `ProxyCommand` forwards the port.
-4. Locally: `main.py serve --model_url=http://127.0.0.1:8001 --web` starts the assistant and opens the browser.
-5. On Ctrl+C: the tunnel is closed and the VM is stopped. The fine-tuned model is **not** downloaded by default (it is ~3 GB); pass `--download` to fetch it into `export/out-jern/`, or `--keep` to leave the VM running and `--reuse` next time to skip the fine-tune.
+4. Locally: `main.py serve --model_url=http://127.0.0.1:8001` starts the assistant (add `--web` to open the browser).
+5. On Ctrl+C: the tunnel is closed and the VM is stopped. Without `HF_REPO` the adapter is lost with the VM; set it, or `--keep` the VM and `--reuse` it next time.
 
-`colab -- model` does steps 1–3 only and leaves the tunnel open, for running `serve --model_url=...` yourself (e.g. with different flags, or several times).
-
-Extra flags after `--` are passed to both sides where they make sense: `-- serve --epochs=3 --temperature=0.5`.
+Flags are passed to both sides where they make sense: `python main.py --epochs=3 --temperature=0.5`.
 
 ## Behind a corporate proxy
 
-The `colab` CLI talks to `*.prod.colab.dev` through the Python `requests` library, which trusts only its bundled CA list. If your network re-signs TLS (the symptom is `CERTIFICATE_VERIFY_FAILED` on `colab upload`), JERN exports the Windows certificate store plus `certifi` to `export/ca-bundle.pem` and sets `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE` for every `colab` call. Set `REQUESTS_CA_BUNDLE` yourself to skip this. The servers themselves use `truststore` for the same reason.
+The `colab` CLI talks to `*.prod.colab.dev` through the Python `requests` library, which trusts only its bundled CA list. If your network re-signs TLS (the symptom is `CERTIFICATE_VERIFY_FAILED` on `colab upload`), Saturday exports the Windows certificate store plus `certifi` to `export/ca-bundle.pem` and sets `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE` for every `colab` call. Set `REQUESTS_CA_BUNDLE` yourself to skip this. The servers themselves use `truststore` for the same reason.
 
 ## Limits
 

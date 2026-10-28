@@ -9,7 +9,7 @@ import pkgutil
 
 from app.tools.base import Plugin
 
-BUILTIN_SKIP = ('base', 'mcp')  # not tool modules
+BUILTIN_SKIP = ('base', 'mcp')
 
 
 def discover():
@@ -23,7 +23,6 @@ def discover():
 
 
 class ToolCatalog:
-    # Descriptions only: what the model is told about the tools. Safe to build where tools must not run (the model VM).
 
     def __init__(self, config):
         from app.tools.mcp import mcp_tools
@@ -51,7 +50,6 @@ class ToolCatalog:
 
 
 class ToolRegistry(ToolCatalog):
-    # Live tool instances: sandboxes, shells, network. Only ever created on the user's machine.
 
     def __init__(self, config):
         super().__init__(config)

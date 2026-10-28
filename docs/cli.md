@@ -10,13 +10,15 @@ With no command, `serve` is assumed. `python main.py --help` prints a summary.
 
 ## Flags
 
-Every command has a config dataclass. Any field can be overridden on the command line:
+`serve`, `model` and `finetune` are configured by `saturday.toml` (Saturday's project file); every key in it can be
+overridden on the command line. The char-model commands (`prepare`, `train`, `sample`, `chat`) keep their own config
+dataclasses.
 
 | Form | Meaning |
 |---|---|
 | `--key=value` | set a field; the value is parsed as a Python literal (`--epochs=3`, `--temperature=0.7`, `--gpu=''`) or kept as a string if it is not one |
-| `--flag` | set a boolean field to `True` (`--web`, `--train`) |
-| `path.py` | a bare argument is a Python file; its top-level variables override fields of the same name |
+| `--flag` | set a boolean field to `True` (`--web`, `--train`, `--local`) |
+| `path.py` | char-model commands only: a Python file whose top-level variables override fields of the same name |
 
 Unknown keys and type mismatches are errors.
 
@@ -24,37 +26,46 @@ Unknown keys and type mismatches are errors.
 
 ### `serve` (default)
 
-Runs the assistant: web UI, HTTP API, tool plugins and — unless `--model_url` is given — the chat model itself. Fine-tunes the base model into `out_dir` on the first run.
+Runs the assistant: web UI, HTTP API and tool plugins on this machine. Where the model runs depends on flags:
 
-Config: `AppConfig` (includes everything in `ChatConfig`).
+| | |
+|---|---|
+| `python main.py` | model on a Colab GPU: Saturday provisions a T4, starts the model server there, opens an SSH tunnel and runs `serve --model_url=...` here |
+| `python main.py serve --local` | model on this machine (trains the LoRA adapter on the first run) |
+| `python main.py serve --model_url=URL` | generation delegated to a model server you started yourself |
 
-| Flag | Default | Purpose |
+| Flag | Default (saturday.toml) | Purpose |
 |---|---|---|
-| `--host`, `--port` | `127.0.0.1`, `8000` | where the UI/API listen |
+| `--host`, `--port` | `127.0.0.1`, `8000` | where the UI/API listen (`[app]`) |
 | `--web` | off | open the browser once the server is up |
-| `--model_url` | `''` | delegate generation to a `model` server at this URL (e.g. the Colab tunnel); no model is loaded locally |
-| `--model_name` | `Qwen/Qwen2.5-1.5B-Instruct` | base model |
-| `--out_dir` | `out-jern` | where the fine-tuned model is saved / loaded from |
-| `--train` | off | fine-tune again even if `out_dir` exists |
-| `--train_layers` | `6` | how many final transformer layers to fine-tune (`0` = all) |
-| `--epochs`, `--learning_rate`, `--batch_size`, `--accumulation`, `--max_length` | `2`, `1e-4`, `1`, `2`, `1024` | fine-tuning; an optimizer step happens every `accumulation` batches |
-| `--temperature`, `--repetition_penalty`, `--max_new_tokens` | `0.3`, `1.1`, `300` | generation |
+| `--local` | off | run the model here instead of on Colab |
+| `--model_url` | `''` | use a running model server; no model is loaded locally |
+| `--model_name` | `Qwen/Qwen2.5-1.5B-Instruct` | base model (any HF chat model) |
+| `--backend` | `transformers` | or `gguf` for llama.cpp quantized models (CPU, inference only, always local) |
+| `--out_dir` | `out-jern` | where the LoRA adapter is saved / loaded from; `HF_REPO` in `.env` keeps it on the Hub |
+| `--train` | off | train the adapter again even if one exists |
+| `--lora_rank`, `--lora_alpha`, `--lora_dropout` | `16`, `32`, `0.05` | adapter size |
+| `--epochs`, `--learning_rate`, `--batch_size`, `--accumulation`, `--max_length` | `3`, `2e-4`, `1`, `2`, `1024` | fine-tuning; an optimizer step happens every `accumulation` batches |
+| `--temperature`, `--repetition_penalty`, `--max_new_tokens` | `0.3`, `1.15`, `300` | generation |
 | `--max_history` | `5` | user turns kept in context |
 | `--max_tool_calls`, `--max_tool_result` | `3`, `1500` | tool loop limits per turn |
-| `--workspace`, `--downloads` | `workspace`, `workspace/downloads` | sandbox for file tools |
-| `--command_timeout` | `60` | seconds a shell command may run |
-| `--mcp` | `mcp.json` | MCP servers to expose as tools (see server.md); `''` disables |
-| `--platform` | this machine | OS name baked into the tool prompt (set by `colab -- serve` so a Linux VM fine-tunes for a Windows user) |
-| `--system_prompt` | `constants.PERSONA` | persona text |
+| `--workspace`, `--downloads` | `workspace`, `workspace/downloads` | sandbox for file tools (`[app]`) |
+| `--command_timeout` | `60` | seconds a shell command may run (`[app]`) |
+| `--mcp` | `mcp.json` | MCP servers to expose as tools (see server.md); `''` disables (`[app]`) |
+| `--gpu`, `--session`, `--keep`, `--reuse` | `T4`, `jern`, off, off | Colab runtime (see colab.md) |
+| `--platform` | this machine | OS name baked into the tool prompt (Saturday sets it so a Linux VM fine-tunes for a Windows user) |
+| `--persona` | `[assistant] persona` | persona text |
 | `--device`, `--seed` | auto, `1337` | |
 
 ### `model`
 
-Runs only the model as an HTTP service (`POST /generate`, `GET /health`) on `--model_port` (default `8001`). Fine-tunes on first run exactly like `serve`. Pair it with `serve --model_url=http://host:8001` on another machine or in another terminal. Takes the same flags as `serve`.
+Runs only the model as an HTTP service (`POST /generate`, `GET /health`) on `--model_port` (default `8001`); this
+is what Saturday starts on the Colab VM. Needs `--local`. Pair it with `serve --model_url=http://host:8001`.
 
 ### `finetune`
 
-Fine-tunes the chat model into `out_dir` and exits. Same flags as `serve`; `--train` is implied.
+Trains the LoRA adapter and exits: on Colab by default (pushed to `HF_REPO` or downloaded to `out-jern/`), on this
+machine with `--local`. Same flags as `serve`; `--train` is implied.
 
 ### `prepare`
 
@@ -62,7 +73,8 @@ Encodes `data/chat/conversations.txt` into `train.bin`, `val.bin` and `meta.pkl`
 
 ### `train`
 
-Trains the from-scratch char-level transformer. Config: `TrainConfig`.
+Trains the from-scratch char-level transformer. Config: `TrainConfig`. Add `--colab` to run it on a Colab GPU and
+download `out-jern-char/` afterwards.
 
 | Flag | Default |
 |---|---|
@@ -80,28 +92,19 @@ Trains the from-scratch char-level transformer. Config: `TrainConfig`.
 
 `sample` prints `--num_samples` continuations of `--start` from the char model in `--out_dir`; `chat` is a terminal conversation with it (`User:` / `JERN:` turns). Config: `SampleConfig` — `--temperature`, `--top_k`, `--max_new_tokens`, `--seed`.
 
-### `colab`
+### Colab
 
-Runs another command on a Google Colab GPU. Flags before `--` configure the runtime; everything after `--` is the command to run there:
-
-```
-python main.py colab [--gpu=T4] [--session=jern] [--keep] [--reuse] -- train --max_iters=5000
-python main.py colab --gpu=L4 -- finetune --epochs=3
-python main.py colab --gpu=T4 -- serve
-```
+There is no separate `colab` command any more: `serve` and `finetune` go to Colab unless `--local` or `--model_url`
+is given, and `train --colab` runs the char model there. Runtime flags live in `[colab]` of `saturday.toml`:
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--gpu` | `T4` | `T4`, `L4`, `G4`, `A100`, `H100`, or `''` for CPU |
-| `--tpu`, `--high_mem` | `''`, off | |
+| `--gpu` | `T4` | `T4`, `L4`, `A100`, or `''` for CPU |
 | `--session` | `jern` | Colab session name |
 | `--reuse` | off | attach to an existing session instead of creating one |
-| `--stop_others` | on | stop every other Colab session first (the free tier allows one GPU session at a time) |
 | `--keep` | off | leave the VM running afterwards |
-| `--download` | off | `serve`: on exit, fetch the fine-tuned model (~3 GB) into `export/`; `train`/`finetune` always download |
-| `--timeout` | `10800` | seconds the remote command may run |
-| `--out` | inferred | which remote directory to download into `export/` |
+| `--remote_timeout` | `10800` | seconds the remote command may run |
 | `--model_port` | `8001` | local port the remote model server is forwarded to |
-| `--browser` | on | `serve`: open the UI in the browser |
 
-For `train` / `finetune` the output directory is downloaded to `export/<out_dir>/` and the VM is stopped. For `serve` (and `model`) the model stays up on the VM, an SSH tunnel forwards it to `127.0.0.1:8001`, and the assistant with its tools and UI runs **locally** against it. See [colab.md](colab.md).
+For `serve` the model stays up on the VM, an SSH tunnel forwards it to `127.0.0.1:8001`, and the assistant with its
+tools and UI runs **locally** against it. See [colab.md](colab.md).

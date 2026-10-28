@@ -38,7 +38,7 @@ class JernOnSaturdayTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.config = configure(['--mcp='], ROOT)  # MCP off: no servers, no secrets needed
+        cls.config = configure(['--mcp='], ROOT)
         cls.registry = ToolRegistry(cls.config)
 
     @classmethod
@@ -48,7 +48,7 @@ class JernOnSaturdayTest(unittest.TestCase):
     def test_config_comes_from_saturday_toml(self):
         c = self.config
         self.assertEqual((c.name, c.model_name, c.out_dir), ('JERN', 'Qwen/Qwen2.5-1.5B-Instruct', 'out-jern'))
-        self.assertEqual((c.workspace, c.port, c.web), ('workspace', 8000, False))  # [app] table
+        self.assertEqual((c.workspace, c.port, c.web), ('workspace', 8000, False))
         self.assertEqual(c.registry, 'app.tools:ToolCatalog')
 
     def test_tools_include_the_moved_automation(self):
@@ -74,7 +74,7 @@ class JernOnSaturdayTest(unittest.TestCase):
         session = Session('abc')
         reply, call = assistant.respond(session, 'what is my hostname')
         self.assertEqual((reply, call), ('You are on this machine.', None))
-        self.assertEqual([s['kind'] for s in session.steps], ['note', 'tool'])  # rewritten to system_info
+        self.assertEqual([s['kind'] for s in session.steps], ['note', 'tool'])
         self.assertEqual(session.steps[1]['name'], 'system_info')
         reply, call = assistant.respond(session, 'shut down the computer')
         self.assertEqual(reply, 'I would like to shut down the computer. Allow?')

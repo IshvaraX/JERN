@@ -1,9 +1,15 @@
-torch
-numpy
-transformers
-requests
-truststore
+# JERN is a Saturday project: the framework brings the model, LoRA fine-tuning, Colab flow and tool-call loop.
+saturday-ai @ git+https://github.com/vivek09thakur/SATURDAY.git
+# web UI + MCP bridge
 fastapi
 uvicorn
 pydantic
 mcp
+# tools
+requests
+pyautogui
+# only if the model runs on this machine (python main.py serve --local) or for the char-level model
+torch
+numpy
+transformers>=5.0.0
+peft>=0.15

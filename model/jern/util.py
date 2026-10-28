@@ -18,7 +18,6 @@ def wait_for_port(host, port, process=None, attempts=120, interval=1.0):
 
 
 def wait_for_health(url, process=None, attempts=120, interval=1.0):
-    # An SSH -L port accepts connections even when the remote end is down, so check end to end.
     import requests
     for _ in range(attempts):
         if process is not None and process.poll() is not None:

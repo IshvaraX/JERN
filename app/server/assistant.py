@@ -37,7 +37,7 @@ class Session(BaseSession):
 
     def __init__(self, session_id):
         super().__init__(user=None, session_id=session_id)
-        self.steps = []  # what happened during the current turn, shown as a timeline in the UI
+        self.steps = []
 
     def begin(self):
         self.steps = []
@@ -47,7 +47,6 @@ class Assistant(BaseAssistant):
 
     GIVE_UP = 'I could not complete that. Could you try again?'
 
-    # Shell commands the small model reaches for when asked about the computer; served via os/sys instead.
     SYSTEM_COMMANDS = {'systeminfo', 'hostname', 'ver', 'winver', 'uname', 'whoami', 'wmic', 'lsb_release', 'sw_vers'}
     SYSTEM_WORDS = re.compile(r'\b(os|hostname|computername|username|version|platform|system)\b', re.IGNORECASE)
     LIST_COMMANDS = {'dir', 'ls', 'tree'}
@@ -73,7 +72,6 @@ class Assistant(BaseAssistant):
         })
 
     def rewrite(self, session, call):
-        # Shell commands that only query the system are redirected to the Python-native tools.
         if call.error or call.name != 'run_command' or not isinstance(call.arguments, dict):
             return call
         words = str(call.arguments.get('command', '')).split()
@@ -83,19 +81,18 @@ class Assistant(BaseAssistant):
         tail = ' '.join(rest)
         target = None
         if head in self.plugins.plugins and head != 'run_command':
-            # the model wrote a tool name as if it were a command, e.g. "system_info" or "list_files D:/"
             plugin = self.plugins.plugins[head]
             target = (head, {next(iter(plugin.parameters)): tail} if rest and plugin.parameters else {})
         elif head in self.SYSTEM_COMMANDS:
             target = ('system_info', {})
         elif head in {'echo', 'type', 'cat'} and self.SYSTEM_WORDS.search(tail) and not re.search(r'[./\\]', tail):
-            target = ('system_info', {})  # e.g. "type os", "echo $HOSTNAME", "echo %COMPUTERNAME%"
+            target = ('system_info', {})
         elif head in self.LIST_COMMANDS:
             flags = ('/', '-') if os.name == 'nt' else ('-',)
             paths = [w for w in rest if not w.startswith(flags)]
             path = paths[0] if paths else '.'
             if not os.path.isabs(path) and not re.match(r'^[a-zA-Z]:', path):
-                path = os.path.join(self.plugins.get('run_command').cwd(session.id), path)  # relative to the terminal
+                path = os.path.join(self.plugins.get('run_command').cwd(session.id), path)
             target = ('list_files', {'path': os.path.normpath(path)})
         if target is None or target[0] not in self.plugins.plugins:
             return call

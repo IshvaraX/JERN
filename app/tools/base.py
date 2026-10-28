@@ -24,8 +24,8 @@ class Sandbox:
 class Plugin(BasePlugin):
     """Saturday's Plugin plus what JERN needs: a sandboxed workspace, per-OS wording, web UI display flags."""
 
-    terminal = False  # show this tool's command and output in the web terminal
-    expand = False  # show this tool's result expanded (not collapsed) under the reply
+    terminal = False
+    expand = False
 
     def __init__(self, config):
         super().__init__(config)
@@ -42,6 +42,5 @@ class Plugin(BasePlugin):
 
     @classmethod
     def describe_class(cls, config):
-        # Same text as describe() on an instance, without instantiating (tools must not run on the model VM).
         parameters, description = cls.template(config)
         return f"- {cls.name}({', '.join(parameters)}): {description}"

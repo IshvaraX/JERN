@@ -25,22 +25,22 @@ class ConfirmRequest(BaseModel):
 
 
 class Step(BaseModel):
-    kind: str  # tool | command | note | error
+    kind: str
     name: str
     summary: str
     command: str | None = None
     result: str | None = None
     expand: bool = False
-    cwd: str | None = None  # terminal working directory after a command
+    cwd: str | None = None
 
 
 class ChatResponse(BaseModel):
     reply: str
     session_id: str
     action_id: str | None = None
-    command: str | None = None  # terminal command awaiting approval via action_id
-    cwd: str | None = None  # terminal working directory the pending command would run in
-    steps: list[Step] = []  # what the assistant did during this turn, in order
+    command: str | None = None
+    cwd: str | None = None
+    steps: list[Step] = []
 
 
 class Server:

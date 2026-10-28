@@ -34,7 +34,6 @@ class ResultParser(HTMLParser):
 
     @staticmethod
     def target(href):
-        # DuckDuckGo wraps links as //duckduckgo.com/l/?uddg=<encoded url>
         query = parse_qs(urlparse(href).query)
         return unquote(query['uddg'][0]) if 'uddg' in query else href
 
