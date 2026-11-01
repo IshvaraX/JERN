@@ -81,6 +81,7 @@ class ChatServer(Server):
         self.sessions = {}
         self.app.get('/', include_in_schema=False)(self.index)
         self.app.get(f'/{ICON_FILE}', include_in_schema=False)(self.icon)
+        self.app.get('/favicon.ico', include_in_schema=False)(self.icon)
         self.app.post('/chat', response_model=ChatResponse)(self.chat)
         self.app.post('/confirm', response_model=ChatResponse)(self.confirm)
         self.app.get('/tools')(self.tools)
