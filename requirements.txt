@@ -7,7 +7,6 @@ pydantic
 mcp
 # tools
 requests
-pyautogui
 # only if the model runs on this machine (python main.py serve --local) or for the char-level model
 torch
 numpy

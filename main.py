@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +35,27 @@ def saturday_config(argv):
 
     truststore.inject_into_ssl()
     load_env()
-    return configure(argv, ROOT)
+    config = configure(argv, ROOT)
+    if not config.hf_repo and os.environ.get('HF_TOKEN'):
+        config.hf_repo = default_hf_repo(config.model_name)
+        if config.hf_repo:
+            os.environ['HF_REPO'] = config.hf_repo  # forwarded to the Colab VM so it pushes there too
+    return config
+
+
+def default_hf_repo(model_name):
+    """<hub user>/jern-<base model>, so each base model keeps its own adapter and is trained once."""
+    from huggingface_hub import HfApi
+
+    try:
+        user = HfApi().whoami()['name']
+    except Exception as error:
+        print(f"HF_REPO not set and the Hub account could not be read ({type(error).__name__}); the adapter stays local")
+        return ''
+    slug = re.sub(r'[^a-z0-9]+', '-', model_name.rsplit('/', 1)[-1].lower()).strip('-')
+    repo = f"{user}/jern-{slug}"
+    print(f"adapter repo: {repo} (set HF_REPO in .env to override)")
+    return repo
 
 
 def serve(argv):

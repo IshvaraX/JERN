@@ -2,8 +2,6 @@ import os
 
 from saturday.plugins import Plugin as BasePlugin
 
-from constants import DEFAULT_SHELL, SHELL_NAMES
-
 
 class Sandbox:
 
@@ -22,19 +20,14 @@ class Sandbox:
 
 
 class Plugin(BasePlugin):
-    """Saturday's Plugin plus what JERN needs: a sandboxed workspace, per-OS wording, web UI display flags."""
+    """Saturday's Plugin plus what JERN needs: a sandboxed downloads workspace and the web UI display flag."""
 
-    terminal = False
     expand = False
 
     def __init__(self, config):
         super().__init__(config)
         self.workspace = Sandbox(config.path(config.workspace))
         self.parameters, self.description = self.template(config)
-
-    @staticmethod
-    def shell_name(config):
-        return SHELL_NAMES.get(config.platform_name().split()[0], DEFAULT_SHELL)
 
     @classmethod
     def template(cls, config):

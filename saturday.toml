@@ -33,9 +33,8 @@ exclude = ["mcp.json", "mcp-servers", "notebook", "docs", "workspace", "*.ipynb"
 registry = "app.tools:ToolCatalog"  # descriptions for the system prompt; main.py instantiates ToolRegistry locally
 
 [app]
-workspace = "workspace"          # sandbox for the file tools
+workspace = "workspace"          # where the download tool saves files
 downloads = "workspace/downloads"
-command_timeout = 60
 mcp = "mcp.json"                 # MCP servers config; "" disables
 host = "127.0.0.1"
 port = 8000

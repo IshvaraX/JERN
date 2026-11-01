@@ -51,38 +51,31 @@ class JernOnSaturdayTest(unittest.TestCase):
         self.assertEqual((c.workspace, c.port, c.web), ('workspace', 8000, False))
         self.assertEqual(c.registry, 'app.tools:ToolCatalog')
 
-    def test_tools_include_the_moved_automation(self):
+    def test_tools_are_the_web_and_browser_set(self):
         names = {p.name for p in self.registry}
-        for name in ('open_website', 'play_youtube', 'search_location', 'weather', 'send_email', 'shutdown',
-                     'close_tab', 'connected_devices', 'run_command', 'list_files', 'system_info'):
-            self.assertIn(name, names)
+        self.assertEqual(names, {'search_web', 'fetch_web', 'download', 'open_website', 'play_youtube',
+                                 'search_location', 'weather', 'send_email'})
         catalog = ToolCatalog(self.config)
         self.assertEqual(set(catalog.classes), names)
         self.assertEqual(catalog.describe(), self.registry.describe())
         catalog.close()
 
-    def test_rewrite_timeline_and_confirmation(self):
+    def test_timeline_and_confirmation(self):
         ScriptedAssistant.replies = [
-            '<tool_call>{"name": "run_command", "arguments": {"command": "hostname"}}</tool_call>',
-            'You are on this machine.',
-            '<tool_call>{"name": "shutdown", "arguments": {}}</tool_call>',
-            'Okay, leaving it on.',
+            '<tool_call>{"name": "send_email", "arguments": {"contact": "mom", "subject": "hi", "body": "hello"}}</tool_call>',
+            'Okay, I will not send it.',
         ]
         log = EventLog()
         assistant = ScriptedAssistant(self.config, self.registry, log)
         server = ChatServer(assistant, log)
         session = Session('abc')
-        reply, call = assistant.respond(session, 'what is my hostname')
-        self.assertEqual((reply, call), ('You are on this machine.', None))
-        self.assertEqual([s['kind'] for s in session.steps], ['note', 'tool'])
-        self.assertEqual(session.steps[1]['name'], 'system_info')
-        reply, call = assistant.respond(session, 'shut down the computer')
-        self.assertEqual(reply, 'I would like to shut down the computer. Allow?')
+        reply, call = assistant.respond(session, 'email mom saying hello')
+        self.assertEqual(reply, 'I would like to email mom about "hi". Allow?')
         self.assertIs(session.pending, call)
         response = server.response(session, reply, call)
-        self.assertEqual(response.action_id, call.id)
+        self.assertEqual((response.action_id, response.steps), (call.id, []))
         reply, call = assistant.resume(session, False)
-        self.assertEqual((reply, call), ('Okay, leaving it on.', None))
+        self.assertEqual((reply, call), ('Okay, I will not send it.', None))
         self.assertEqual(session.history[-2], {'role': 'tool', 'content': 'denied by user'})
         self.assertTrue(any(e['kind'] == 'wait' for e in log.since(0)))
 

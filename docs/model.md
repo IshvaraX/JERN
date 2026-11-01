@@ -12,12 +12,10 @@ JERN: Quite a few things! Here's a quick overview:
 - Answer questions
 - Search the web
 ---
-User: list my files
-JERN: <tool_call>{"name": "list_files", "arguments": {"path": "."}}</tool_call>
-Tool: workspace:
-notes/
-todo.md (0.1 KB)
-JERN: You have a notes folder and a todo.md file.
+User: what is the weather in delhi
+JERN: <tool_call>{"name": "weather", "arguments": {"city": "Delhi"}}</tool_call>
+Tool: Delhi: 31°C, haze, humidity 40%
+JERN: It's 31°C and hazy in Delhi right now.
 ```
 
 Speaker tags: `User:` → user, `JERN:` (or `Assistant:`) → assistant, `Tool:` → tool result; an optional first line `Context: ...` is appended to the system prompt (Saturday's `ConversationFile`). A system message with the persona and tool list is prepended to every conversation at training time.

@@ -28,18 +28,14 @@ class Step(BaseModel):
     kind: str
     name: str
     summary: str
-    command: str | None = None
     result: str | None = None
     expand: bool = False
-    cwd: str | None = None
 
 
 class ChatResponse(BaseModel):
     reply: str
     session_id: str
     action_id: str | None = None
-    command: str | None = None
-    cwd: str | None = None
     steps: list[Step] = []
 
 
@@ -99,29 +95,15 @@ class ChatServer(Server):
         return [{'name': p.name, 'description': p.description, 'confirm': p.confirm} for p in self.assistant.plugins]
 
     def response(self, session, reply, call):
-        command = cwd = None
-        if call is not None:
-            plugin = self.assistant.plugins.get(call.name)
-            if plugin.terminal:
-                command = call.arguments.get('command', '')
-                cwd = plugin.cwd(session.id)
-        return ChatResponse(reply=reply, session_id=session.id, action_id=call.id if call else None,
-                            command=command, cwd=cwd, steps=session.steps)
+        return ChatResponse(reply=reply, session_id=session.id, action_id=call.id if call else None, steps=session.steps)
 
     def session(self, session_id):
         session_id = session_id or uuid.uuid4().hex
         if session_id not in self.sessions and len(self.sessions) >= self.MAX_SESSIONS:
-            evicted = self.sessions.pop(next(iter(self.sessions)))
-            self.close_shells(evicted.id)
+            self.sessions.pop(next(iter(self.sessions)))
         return self.sessions.setdefault(session_id, Session(session_id))
 
-    def close_shells(self, session_id=None):
-        for plugin in self.assistant.plugins:
-            if plugin.terminal:
-                plugin.close(session_id) if session_id else plugin.close_all()
-
     def close(self):
-        self.close_shells()
         self.assistant.plugins.close()
 
     def chat(self, request: ChatRequest):

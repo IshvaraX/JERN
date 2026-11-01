@@ -25,11 +25,9 @@ Splitting them is what lets the model run on a Colab GPU while the tools keep ru
   "reply": "text to show",
   "session_id": "...",
   "action_id": null,          // set when a tool needs approval; answer via /confirm
-  "command": null,            // the shell command awaiting approval, if the tool is the terminal
-  "cwd": null,                // terminal working directory
   "steps": [                  // what happened this turn, in order
-    {"kind": "tool|command|note|error", "name": "list_files", "summary": "list files in .",
-     "command": null, "result": "...", "expand": false, "cwd": null}
+    {"kind": "tool|note|error", "name": "search_web", "summary": "search the web for ...",
+     "result": "...", "expand": false}
   ]
 }
 ```
@@ -45,73 +43,65 @@ Sessions live in memory (`Session`: history, pending tool call, steps of the cur
 
 ## The assistant loop (`app/server/assistant.py`)
 
-`Assistant` subclasses `saturday.assistant.Assistant`, which owns the loop; JERN overrides its hooks (`rewrite`,
-`run_arguments`, `note`, `confirm_question`, `give_up`). `respond(session, message)`:
+`Assistant` subclasses `saturday.assistant.Assistant`, which owns the loop; JERN overrides its hooks (`note`,
+`confirm_question`, `give_up`). `respond(session, message)`:
 
 1. Append the user message, trim history to `max_history` user turns.
 2. Build the system prompt: the persona from `saturday.toml` + Saturday's tool prompt with the plugin list and the OS name (`config.platform_name()`), plus a context line with the current time.
 3. Generate. If the reply contains no `<tool_call>`, return it.
-4. Otherwise parse the call (`ToolCall.parse`, tolerant of single-backslash Windows paths and a few alternative key names), rewrite shell commands that only query the system to the native tools (`rewrite`), validate arguments against the plugin's parameter list.
+4. Otherwise parse the call (`ToolCall.parse`, tolerant of a few alternative key names) and validate arguments against the plugin's parameter list.
 5. If the plugin requires confirmation, stash it as `session.pending` and return a question with an `action_id`; `resume(session, allow)` continues after `/confirm`.
-6. Else run it (`run_arguments` adds the session id for terminal tools), append the result as a `tool` message (truncated to `max_tool_result`), and loop — at most `max_tool_calls` times per turn.
+6. Else run it, append the result as a `tool` message (truncated to `max_tool_result`), and loop — at most `max_tool_calls` times per turn.
 
-`note` records each step in `session.steps`, which the UI renders as the activity timeline and the docked terminal.
+`note` records each step in `session.steps`, which the UI renders as the activity timeline.
 
 `saturday.assistant.build_system_prompt(config, plugins)` is also used when fine-tuning so the training data carries the exact prompt the model will see at run time. `--platform` lets a Colab VM build it for the user's OS.
 
 ## Tools (`app/tools/`)
 
-Tools live in their own package, deliberately outside `app/server`, because they touch the user's machine: files, shell, network. Two views of the package, both satisfying Saturday's registry protocol (`describe()`, `get(name)`, iteration):
+Tools live in their own package, deliberately outside `app/server`, because they act on the user's machine: the browser, the downloads folder, the network. Two views of the package, both satisfying Saturday's registry protocol (`describe()`, `get(name)`, iteration):
 
-- **`ToolRegistry(config)`** — live instances (sandbox directories, persistent shells). Created only by `serve`, i.e. only on the user's machine.
+- **`ToolRegistry(config)`** — live instances (downloads sandbox, SMTP settings). Created only by `serve`, i.e. only on the user's machine.
 - **`ToolCatalog(config)`** — the tool classes and their descriptions, nothing instantiated. `saturday.toml` names it as the registry (`[plugins] registry = "app.tools:ToolCatalog"`), so `model` and `finetune` — and the Colab VM — build the system prompt with the exact tool list without ever being able to run a tool.
 
-A tool is a class with class attributes and a `run` method; both views discover every `Plugin` subclass in the package automatically. `app.tools.base.Plugin` extends `saturday.plugins.Plugin` with the workspace sandbox and the UI flags.
+A tool is a class with class attributes and a `run` method; both views discover every `Plugin` subclass in the package automatically. `app.tools.base.Plugin` extends `saturday.plugins.Plugin` with the downloads sandbox and the UI flag.
 
 ```python
+import requests
+
 from app.tools.base import Plugin
 
 class WordCount(Plugin):
     name = 'word_count'
-    description = 'Count the words in a workspace file.'
-    parameters = {'path': 'file path relative to the workspace'}
-    required = ('path',)
+    description = 'Count the words on a web page.'
+    parameters = {'url': 'http(s) address of the page'}
+    required = ('url',)
     confirm = False     # True: ask the user before running
-    terminal = False    # True: show as a terminal command in the UI
     expand = False      # True: show the result expanded under the reply
 
     def summary(self, arguments):
-        return f"count words in {arguments['path']}"
+        return f"count words on {arguments['url']}"
 
-    def run(self, path):
-        with open(self.workspace.resolve(path), encoding='utf-8') as f:
-            return f"{len(f.read().split())} words"
+    def run(self, url):
+        return f"{len(requests.get(url, timeout=10).text.split())} words"
 ```
 
-`self.workspace` is a `Sandbox` rooted at `--workspace`; `resolve()` refuses paths that escape it. Override the classmethod `template(config)` to derive `parameters`/`description` from the configured platform (see `RunCommand`). Return a string; raise `ValueError` for bad input. Results starting with `error:` are shown as errors.
+`self.workspace` is a `Sandbox` rooted at `--workspace` for tools that save files (see `Download`); `resolve()` refuses paths that escape it. Override the classmethod `template(config)` to derive `parameters`/`description` from the configured platform. Return a string; raise `ValueError` for bad input. Results starting with `error:` are shown as errors.
 
 Built-in tools:
 
 | Tool | Confirm | What it does |
 |---|---|---|
-| `list_files` | | list a workspace folder or any absolute path / drive |
-| `read_file` | | read a workspace text file (4000 chars) |
-| `write_file` | yes | create/overwrite a workspace text file |
-| `run_command` | yes | run a line in a persistent `cmd.exe` / `sh` per session; cwd and variables persist |
 | `search_web` | | DuckDuckGo HTML search, top 5 results |
 | `fetch_web` | | readable text of a page (3000 chars) |
 | `download` | yes | save an http(s) URL into `--downloads` (50 MB max) |
-| `system_info` | | OS, hostname, user, CPU, drives, Python |
 | `open_website` | | open a known site name, domain or URL in the browser |
 | `play_youtube` | | play the first YouTube match for a song or video |
 | `search_location` | | show a place on Google Maps |
 | `weather` | | current weather for a city (`OPENWEATHER_API_KEY` in `.env`) |
 | `send_email` | yes | email a contact from `data/contacts.json` over SMTP (`SMTP_*` in `.env`) |
-| `close_tab` | | close the current browser tab |
-| `shutdown` | yes | shut the computer down |
-| `connected_devices` | | devices on the local network from the ARP cache |
 
-The last eight were Saturday's automation and moved here when Saturday became a framework.
+The last five were Saturday's automation and moved here when Saturday became a framework.
 
 ## MCP servers as tools (`app/tools/mcp.py`)
 
@@ -133,7 +123,7 @@ Any [Model Context Protocol](https://modelcontextprotocol.io) server can be plug
 - `tools` is an allowlist (glob patterns) and `exclude` a denylist. Use them: every tool description costs prompt tokens on each turn and a 1.5B model picks tools reliably only up to roughly a dozen.
 - On startup every enabled server is connected (`McpClient`, one background event loop) and each of its tools becomes a `Plugin` subclass named `<server>_<tool>` (the prefix is not repeated when the tool already starts with it, so `maps_directions`, not `maps_maps_directions`). A server that fails to start is logged and skipped; the assistant still starts.
 - Tool descriptions and parameter docs come from the server's JSON schema. The model writes string arguments; they are coerced to the schema's `integer` / `number` / `boolean` / `object` types before the call.
-- Tools the server marks `readOnlyHint` run directly; everything else asks for approval, like `write_file`.
+- Tools the server marks `readOnlyHint` run directly; everything else asks for approval, like `download`.
 - Results (text content, or `structuredContent` as JSON) are truncated to `MCP_MAX_RESULT`.
 - `--mcp=path` selects another config, `--mcp=''` disables MCP entirely. `mcp.json`, `.env` and `mcp-servers/` are **not** shipped to Colab (`ARCHIVE_EXCLUDE`): MCP servers are local processes, so they count as tools and stay on your machine.
 
@@ -155,4 +145,4 @@ With all five enabled and the shipped allowlists, JERN exposes 29 MCP tools plus
 
 ## Web UI (`app/ui/index.html`)
 
-A single HTML file served at `/`: dark, flat, square-cornered theme with one blue accent; chat list in `localStorage`, markdown rendering, an activity timeline for tool calls, inline approve/reject buttons, and a docked terminal that mirrors `run_command` output and working directory. No build step; edit and reload.
+A single HTML file served at `/`, styled with Tailwind CSS v4 (browser build from a CDN, so still no build step): light theme with one blue accent, design tokens in `@theme`, reusable component classes in `@layer components`; chat list in `localStorage`, markdown rendering, a keyboard-operable activity timeline for tool calls, inline approve/reject buttons, and a sidebar that becomes a drawer below 768 px. No build step; edit and reload.

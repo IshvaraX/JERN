@@ -19,8 +19,6 @@ SEED = 1337
 
 MAX_SESSIONS = 1000
 USER_AGENT = f'Mozilla/5.0 {NAME}/1.0'
-SHELL_NAMES = {'Windows': 'Windows cmd'}
-DEFAULT_SHELL = 'POSIX sh'
 UI_DIR = 'ui'
 INDEX_FILE = 'index.html'
 
