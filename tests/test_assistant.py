@@ -7,6 +7,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from fastapi.testclient import TestClient  # noqa: E402
 from saturday.config import configure  # noqa: E402
 
 from app.server.api import ChatServer  # noqa: E402
@@ -38,7 +39,7 @@ class JernOnSaturdayTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.config = configure(['--mcp='], ROOT)
+        cls.config = configure([], ROOT)
         cls.registry = ToolRegistry(cls.config)
 
     @classmethod
@@ -47,106 +48,42 @@ class JernOnSaturdayTest(unittest.TestCase):
 
     def test_config_comes_from_saturday_toml(self):
         c = self.config
-        self.assertEqual((c.name, c.model_name, c.out_dir), ('JERN', 'Qwen/Qwen2.5-1.5B-Instruct', 'out-jern'))
-        self.assertEqual((c.workspace, c.port, c.web), ('workspace', 8000, False))
+        self.assertEqual((c.name, c.model_name, c.out_dir), ('JERN', 'microsoft/Phi-3.5-mini-instruct', 'out-jern'))
+        self.assertEqual((c.port, c.web), (8000, False))
         self.assertEqual(c.registry, 'app.tools:ToolCatalog')
 
-    def test_tools_are_the_web_and_browser_set(self):
+    def test_tools_are_search_and_weather(self):
         names = {p.name for p in self.registry}
-        self.assertEqual(names, {'search_web', 'fetch_web', 'download', 'open_website', 'play_youtube',
-                                 'search_location', 'weather'})
+        self.assertEqual(names, {'search_web', 'weather'})
         catalog = ToolCatalog(self.config)
         self.assertEqual(set(catalog.classes), names)
         self.assertEqual(catalog.describe(), self.registry.describe())
         catalog.close()
 
-    def test_timeline_and_confirmation(self):
+    def test_tool_step_lands_in_the_timeline(self):
         ScriptedAssistant.replies = [
-            '<tool_call>{"name": "download", "arguments": {"url": "https://example.com/report.pdf"}}</tool_call>',
-            'Okay, I will not download it.',
+            '<tool_call>{"name": "weather", "arguments": {"city": "Bengaluru"}}</tool_call>',
+            'It is 27°C and cloudy in Bengaluru.',
         ]
         log = EventLog()
         assistant = ScriptedAssistant(self.config, self.registry, log)
-        server = ChatServer(assistant, log)
         session = Session('abc')
-        reply, call = assistant.respond(session, 'download the report')
-        self.assertEqual(reply, 'I would like to download https://example.com/report.pdf. Allow?')
-        self.assertIs(session.pending, call)
-        response = server.response(session, reply, call)
-        self.assertEqual((response.action_id, response.steps), (call.id, []))
-        reply, call = assistant.resume(session, False)
-        self.assertEqual((reply, call), ('Okay, I will not download it.', None))
-        self.assertEqual(session.history[-2], {'role': 'tool', 'content': 'denied by user'})
-        self.assertTrue(any(e['kind'] == 'wait' for e in log.since(0)))
+        reply, call = assistant.respond(session, 'weather in bengaluru')
+        self.assertEqual((reply, call), ('It is 27°C and cloudy in Bengaluru.', None))
+        self.assertEqual([(s['kind'], s['name']) for s in session.steps], [('tool', 'weather')])
+        self.assertIn('OPENWEATHER_API_KEY', session.steps[0]['result'])
 
-    def test_hosted_mode_password_and_disabled_tools(self):
-        from base64 import b64encode
-
-        from fastapi.testclient import TestClient
-
-        config = configure(['--mcp=', '--disabled_tools=open_website,play_youtube,search_location'], ROOT)
-        registry = ToolRegistry(config)
-        self.assertEqual({p.name for p in registry}, {'search_web', 'fetch_web', 'download', 'weather'})
-        os.environ['JERN_PASSWORD'] = 'secret'
-        try:
-            client = TestClient(ChatServer(ScriptedAssistant(config, registry, EventLog()), EventLog()).app)
-        finally:
-            del os.environ['JERN_PASSWORD']
-        self.assertEqual(client.get('/health').status_code, 200)
-        denied = client.get('/tools')
-        self.assertEqual((denied.status_code, denied.headers['www-authenticate']), (401, 'Basic realm="JERN"'))
-        self.assertEqual(client.get('/tools', headers={'Authorization': 'Basic ' + b64encode(b'x:wrong').decode()}).status_code, 401)
-        self.assertEqual(client.get('/tools', headers={'Authorization': 'Basic ' + b64encode(b'x:secret').decode()}).status_code, 200)
-        registry.close()
-
-    def test_sign_in_through_ishvarax_backend(self):
-        from unittest import mock
-
-        from fastapi.testclient import TestClient
-
-        from app.server import api
-
-        class FakeResponse:
-            def __init__(self, status, body):
-                self.status_code, self.body, self.ok, self.reason = status, body, status < 400, 'x'
-
-            def json(self):
-                return self.body
-
-        def fake_post(url, json, timeout):
-            if url.endswith('/auth/login'):
-                if json['password'] != 'hunter22':
-                    return FakeResponse(401, {'detail': 'Invalid credentials'})
-                return FakeResponse(200, {'message': 'Login successful', 'token': 'backend-token',
-                                          'user': {'username': 'vivek', 'email': 'v@example.com', 'photo': 'x' * 100}})
-            if url.endswith('/auth/register'):
-                return FakeResponse(201, {'message': 'User registered successfully'})
-            raise AssertionError(url)
-
-        ScriptedAssistant.replies = ['Hello Vivek!']
-        os.environ['AUTH_URL'] = 'https://hfi-backend.example'
-        try:
-            server = ChatServer(ScriptedAssistant(self.config, self.registry, EventLog()), EventLog())
-        finally:
-            del os.environ['AUTH_URL']
-        client = TestClient(server.app)
-        self.assertEqual(client.get('/auth/me').status_code, 401)
-        self.assertEqual(client.get('/tools').status_code, 401)
-        self.assertEqual(client.post('/chat', json={'message': 'hi'}).status_code, 401)
-        with mock.patch.object(api.requests, 'post', fake_post):
-            bad = client.post('/auth/login', json={'username': 'vivek', 'password': 'nope'})
-            self.assertEqual((bad.status_code, bad.json()['detail']), (401, 'Invalid credentials'))
-            good = client.post('/auth/login', json={'username': 'v@example.com', 'password': 'hunter22'}).json()
-            self.assertEqual(good['user'], {'username': 'vivek', 'email': 'v@example.com'})
-            signup = client.post('/auth/register', json={'username': 'newbie', 'email': 'n@example.com', 'password': 'hunter22'})
-            self.assertEqual(signup.status_code, 200)
-        headers = {'Authorization': f"Bearer {good['token']}"}
-        self.assertEqual(client.get('/auth/me', headers=headers).json(), {'enabled': True, 'user': 'vivek'})
-        self.assertEqual(client.get('/tools', headers=headers).status_code, 200)
-        chat = client.post('/chat', json={'message': 'hi'}, headers=headers).json()
-        self.assertEqual(chat['reply'], 'Hello Vivek!')
-        self.assertIn(('vivek', chat['session_id']), server.sessions)
-        self.assertEqual(client.get('/tools', headers={'Authorization': 'Bearer ' + good['token'][:-2] + 'xx'}).status_code, 401)
+    def test_http_api(self):
+        ScriptedAssistant.replies = ['Hello!']
+        log = EventLog()
+        client = TestClient(ChatServer(ScriptedAssistant(self.config, self.registry, log), log).app)
+        self.assertEqual(client.get('/health').json(), {'status': 'ok'})
+        self.assertEqual(client.get('/').status_code, 200)
+        self.assertEqual(client.get('/icon.svg').headers['content-type'], 'image/svg+xml')
+        self.assertEqual([t['name'] for t in client.get('/tools').json()], ['search_web', 'weather'])
+        data = client.post('/chat', json={'message': 'hi'}).json()
+        self.assertEqual((data['reply'], data['action_id'], data['steps']), ('Hello!', None, []))
+        self.assertEqual(client.post('/confirm', json={'session_id': data['session_id'], 'action_id': 'x', 'allow': True}).status_code, 404)
 
 
 if __name__ == '__main__':

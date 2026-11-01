@@ -1,9 +1,7 @@
 # secrets and personal data
 .env
 
-# local MCP server checkouts, workspace sandbox, Colab staging, trained models
-mcp-servers/
-workspace/
+# Colab staging, trained models
 export/
 out-*/
 *.log

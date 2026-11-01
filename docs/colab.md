@@ -22,13 +22,13 @@ python main.py train --colab --max_iters=5000 --lr_decay_iters=5000
 
 What happens (`saturday.colab.ColabRunner`):
 
-1. The repo is zipped to `export/saturday-upload.zip` under `project/`, with the installed `saturday` package alongside under `saturday/` so the VM runs exactly the framework version you have. `venv`, `.git`, `out-*`, `export`, `workspace`, data binaries and the `[colab] exclude` list from `saturday.toml` (`mcp.json`, `mcp-servers`, `notebook`, `docs`) stay home.
+1. The repo is zipped to `export/saturday-upload.zip` under `project/`, with the installed `saturday` package alongside under `saturday/` so the VM runs exactly the framework version you have. `venv`, `.git`, `out-*`, `export`, data binaries and the `[colab] exclude` list from `saturday.toml` (`notebook`, `docs`) stay home.
 2. Every other Colab session is stopped (the free tier allows one), then `colab new -s jern --gpu T4` provisions the VM; `colab upload` sends the zip.
 3. `colab exec` runs a small Python script on the VM: unzip, `pip install transformers peft huggingface_hub`, run the command (`python -m saturday finetune --local --platform="<your OS>"`, or `main.py train` for the char model) streaming its output. The script prints a sentinel on success; without it the run is treated as failed (IPython swallows exit codes).
 4. `finetune` pushes the adapter to `HF_REPO` when set, otherwise `colab download` fetches `out-jern/`; `train --colab` always downloads `out-jern-char/`.
 5. `colab stop` releases the VM (skip with `--keep`).
 
-Rough timings on a T4: provisioning ~1 min, install ~1 min, `train` with defaults 1–2 min, LoRA `finetune` of the 1.5B model ~5 min (the first run also downloads ~3 GB of weights).
+Rough timings on a T4: provisioning ~1 min, install ~1 min, `train` with defaults 1–2 min, LoRA `finetune` of the 3.8B model ~10 min (the first run also downloads ~7.5 GB of weights).
 
 ## Interactive: `serve`
 
@@ -42,7 +42,7 @@ The model runs on the GPU; **the assistant, every tool and the UI run on your ma
  your machine                                   Colab VM
  ┌──────────────────────────────┐              ┌──────────────────────────┐
  │ browser → ChatServer :8000   │              │ saturday model :8001     │
- │           Assistant + tools  │  ssh -L 8001 │   Qwen + LoRA (GPU)      │
+ │           Assistant + tools  │  ssh -L 8001 │   Phi-3.5 + LoRA (GPU)   │
  │           RemoteChat ────────┼──────────────┼─→ POST /generate         │
  └──────────────────────────────┘              └──────────────────────────┘
 ```

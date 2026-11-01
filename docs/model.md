@@ -24,11 +24,11 @@ Edit the file to teach JERN new facts or behaviours, then run `python main.py fi
 
 ## Chat model (Saturday, `saturday.models`)
 
-JERN's chat model is provided by the [Saturday](https://github.com/vivek09thakur/SATURDAY) framework and configured in `saturday.toml` (`[model]`). The default base is `Qwen/Qwen2.5-1.5B-Instruct`, chosen because its chat template natively uses the same `<tool_call>{...}</tool_call>` format JERN parses and understands `tool` role messages.
+JERN's chat model is provided by the [Saturday](https://github.com/vivek09thakur/SATURDAY) framework and configured in `saturday.toml` (`[model]`). The default base is `microsoft/Phi-3.5-mini-instruct` (3.8B): a strong small instruct model with a 128k context and a chat template that supports `system` and `tool` messages. The `<tool_call>{...}</tool_call>` format JERN parses is taught by the fine-tune. Phi-3 fuses its attention and MLP projections (`qkv_proj`, `gate_up_proj`); `main.py` adds those names to Saturday's LoRA target list so the adapter covers them.
 
 **Loading**: the base model is loaded and a LoRA adapter is looked up in `out-jern/`, then on the Hub at `HF_REPO`. An adapter is reused only if its `adapter_config.json` names the configured base model; otherwise (or with `--train`) a fresh one is trained, saved, pushed to `HF_REPO` when set, and merged into the base weights for inference.
 
-**Fine-tuning**: the conversation file is rendered through the tokenizer's chat template; only assistant tokens contribute to the loss. LoRA (rank 16, alpha 32) on the attention and MLP projections of the language model, fp16 autocast with a `GradScaler` on CUDA, gradient checkpointing, `batch_size=1` × `accumulation=2`, AdamW at `2e-4`, gradient clipping at 1.0, `epochs=3`. The 1.5B model fits comfortably on a 15 GB T4; Saturday's default Ministral 3 3B does too.
+**Fine-tuning**: the conversation file is rendered through the tokenizer's chat template; only assistant tokens contribute to the loss. LoRA (rank 16, alpha 32) on the attention and MLP projections of the language model, fp16 autocast with a `GradScaler` on CUDA, gradient checkpointing, `batch_size=1` × `accumulation=2`, AdamW at `2e-4`, gradient clipping at 1.0, `epochs=3`. The 3.8B model in fp16 takes ~7.6 GB of the T4's 15 GB; with gradient checkpointing and `max_length=1024` training fits.
 
 **Generation**: chat template → `model.generate` with `temperature`, `top_p=0.9`, `repetition_penalty`, `no_repeat_ngram_size`; `temperature=0` switches to greedy.
 
@@ -37,8 +37,8 @@ JERN's chat model is provided by the [Saturday](https://github.com/vivek09thakur
 | Base model | Fits |
 |---|---|
 | Qwen2.5-0.5B-Instruct | laptop CPU (slow), any GPU |
-| Qwen2.5-1.5B-Instruct (JERN default) | T4 and up |
-| Ministral-3-3B-Instruct (Saturday default) | T4 with LoRA; needs `transformers>=5` |
+| SmolLM2-1.7B-Instruct, Qwen2.5-1.5B-Instruct | T4 and up |
+| Phi-3.5-mini-instruct (JERN default), Qwen2.5-3B-Instruct | T4 with LoRA |
 | a GGUF quant of any of them (`backend = "gguf"`) | laptop CPU, no training |
 
 ## Char model (`model/jern/network.py`, `train.py`, `sample.py`)

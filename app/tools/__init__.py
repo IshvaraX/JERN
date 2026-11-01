@@ -1,4 +1,4 @@
-"""JERN's tool registry: every Plugin subclass in this package plus the MCP servers from mcp.json.
+"""JERN's tool registry: every Plugin subclass in this package.
 
 Both classes satisfy Saturday's registry protocol (describe(), get(name), iteration), so saturday.toml points at
 them: `[plugins] registry = "app.tools:ToolCatalog"` builds descriptions only, which is what the model VM and
@@ -9,7 +9,7 @@ import pkgutil
 
 from app.tools.base import Plugin
 
-BUILTIN_SKIP = ('base', 'mcp')
+BUILTIN_SKIP = ('base',)
 
 
 def discover():
@@ -25,13 +25,8 @@ def discover():
 class ToolCatalog:
 
     def __init__(self, config):
-        from app.tools.mcp import mcp_tools
-
         self.config = config
-        disabled = {name.strip() for name in str(getattr(config, 'disabled_tools', '') or '').split(',') if name.strip()}
-        self.classes = {cls.name: cls for cls in discover() if cls.name not in disabled}
-        self.mcp, external = mcp_tools(config.path(config.mcp) if config.mcp else '')
-        self.classes.update({cls.name: cls for cls in external if cls.name not in disabled})
+        self.classes = {cls.name: cls for cls in discover()}
 
     def __iter__(self):
         return iter(self.classes.values())
@@ -46,8 +41,7 @@ class ToolCatalog:
         raise ValueError(f"tools do not run here (catalog only): {name}")
 
     def close(self):
-        if self.mcp is not None:
-            self.mcp.close()
+        pass
 
 
 class ToolRegistry(ToolCatalog):

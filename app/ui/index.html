@@ -114,10 +114,6 @@
     .dialog ul { @apply list-disc pl-5; }
     .dialog li + li { @apply mt-1; }
     .dialog strong { @apply font-semibold text-text; }
-    .field { @apply mt-3 block; }
-    .field span { @apply mb-1 block text-sm text-muted; }
-    .field input { @apply block h-control w-full rounded-sm border border-border bg-bg px-3 text-text outline-none placeholder:text-faint focus:border-accent; }
-    .link { @apply text-sm text-accent underline-offset-2 hover:underline; }
   }
 </style>
 </head>
@@ -135,11 +131,6 @@
   <h2 class="section-title mt-6 mb-1 px-3">Chats</h2>
   <div id="chats" class="min-h-0 flex-1 overflow-y-auto"></div>
   <div class="mt-2 border-t border-border pt-2">
-    <div id="account" class="flex h-control items-center gap-3 px-3 text-sm" hidden>
-      <span id="avatar" class="grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-semibold text-accent uppercase" aria-hidden="true"></span>
-      <span id="username" class="min-w-0 flex-1 truncate"></span>
-      <button id="signout" class="link" type="button">Sign out</button>
-    </div>
     <button id="about" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01"/></svg>About JERN</button>
   </div>
 </aside>
@@ -165,10 +156,8 @@
       </form>
       <div id="suggestions" class="mt-4 flex-wrap justify-center gap-2">
         <button class="chip" type="button" data-prompt="Search the web for "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4"/></svg>Search the web</button>
-        <button class="chip" type="button" data-prompt="What is the weather in Bengaluru?"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Weather</button>
-        <button class="chip" type="button" data-prompt="Play "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Play a video</button>
-        <button class="chip" type="button" data-prompt="Show me "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12zM12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>Find a place</button>
-        <button class="chip" type="button" data-prompt="Summarize https://"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5"/></svg>Read a page</button>
+        <button class="chip" type="button" data-prompt="What is the weather in Bengaluru?"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.5-8 6 6 0 0 1 11.3 1.5A3.5 3.5 0 0 1 17.5 18z"/></svg>Weather</button>
+        <button class="chip" type="button" data-prompt="Explain "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01"/></svg>Explain a topic</button>
       </div>
     </div>
   </div>
@@ -180,11 +169,11 @@
       <span class="size-8 shrink-0 bg-[image:var(--logo)] bg-contain bg-center bg-no-repeat" aria-hidden="true"></span>
       <h2 id="about-title">What JERN is</h2>
     </div>
-    <p><strong>JERN</strong> (Just An Experimental Response Network) is a small personal assistant by Vivek Thakur. A fine-tuned 1.5B language model does the thinking; the tools do the work on <strong>this computer</strong>.</p>
+    <p><strong>JERN</strong> (Just An Experimental Response Network) is a small personal assistant by Vivek Thakur. A fine-tuned small language model does the thinking; it runs on your computer or on a free Google Colab GPU.</p>
     <ul>
-      <li><strong>Local hands.</strong> Web search, page reading, downloads, browser, YouTube, maps and weather run on your machine. Anything that changes something asks for your approval first.</li>
-      <li><strong>Cloud brain, optionally.</strong> The model can run on a free Google Colab GPU. When it does, your messages and tool results are sent there.</li>
-      <li><strong>Experimental.</strong> A small model sometimes picks the wrong tool or repeats itself. Read a command before you approve it.</li>
+      <li><strong>Chat.</strong> Ask questions, get explanations, talk things through. JERN knows about Vivek and keeps the recent conversation in mind.</li>
+      <li><strong>Two tools.</strong> It can search the web and check the weather; everything else is the model's own knowledge.</li>
+      <li><strong>Experimental.</strong> A small model sometimes gets facts wrong or repeats itself. Treat answers as a starting point.</li>
     </ul>
     <label class="mt-5 flex items-start gap-3 text-sm">
       <input id="about-ack" type="checkbox" class="mt-0.5 size-4 shrink-0 accent-accent">
@@ -192,23 +181,6 @@
     </label>
     <div class="mt-5 flex justify-end">
       <button class="btn-primary" type="submit">Got it</button>
-    </div>
-  </form>
-</dialog>
-<dialog id="auth-dialog" class="dialog" aria-labelledby="auth-title">
-  <form id="auth-form" novalidate>
-    <div class="flex items-center gap-3">
-      <span class="size-8 shrink-0 bg-[image:var(--logo)] bg-contain bg-center bg-no-repeat" aria-hidden="true"></span>
-      <h2 id="auth-title">Sign in to JERN</h2>
-    </div>
-    <p id="auth-hint">Use your Ishvarax account.</p>
-    <label class="field"><span id="auth-user-label">Username or email</span><input id="auth-user" name="username" autocomplete="username" required maxlength="255"></label>
-    <label class="field" id="auth-email-field" hidden><span>Email</span><input id="auth-email" name="email" type="email" autocomplete="email" maxlength="255" placeholder="you@example.com"></label>
-    <label class="field"><span>Password</span><input id="auth-password" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
-    <p id="auth-error" class="text-error" role="alert" hidden></p>
-    <div class="mt-5 flex items-center justify-between gap-3">
-      <button id="auth-switch" class="link" type="button">Create an account</button>
-      <button id="auth-submit" class="btn-primary" type="submit">Sign in</button>
     </div>
   </form>
 </dialog>
@@ -257,7 +229,7 @@
     plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4',
     chevron: 'M9 6l6 6-6 6',
   };
-  const TOOL_ICONS = { search_web: 'search', fetch_web: 'globe', download: 'download', open_website: 'globe', play_youtube: 'play', search_location: 'pin', weather: 'cloud' };
+  const TOOL_ICONS = { search_web: 'search', weather: 'cloud' };
   const toolIcon = (name) => TOOL_ICONS[name] || 'plug';
 
   function icon(name) {
@@ -318,31 +290,9 @@
     return html.join('');
   }
 
-  const auth = {
-    enabled: false,
-    token: localStorage.getItem('jern.token'),
-    user: JSON.parse(localStorage.getItem('jern.user') || 'null'),
-    key(name) { return this.user ? `${name}.${this.user.username}` : name; },
-    set(token, user) {
-      this.token = token; this.user = user;
-      if (token) { localStorage.setItem('jern.token', token); localStorage.setItem('jern.user', JSON.stringify(user)); }
-      else { localStorage.removeItem('jern.token'); localStorage.removeItem('jern.user'); }
-      renderAccount();
-    },
-  };
-
-  function api(url, options = {}) {
-    const headers = { ...(options.headers || {}) };
-    if (auth.token) headers.Authorization = `Bearer ${auth.token}`;
-    return fetch(url, { ...options, headers }).then((response) => {
-      if (response.status === 401 && auth.enabled && !url.startsWith('/auth/')) { auth.set(null, null); showAuth(); }
-      return response;
-    });
-  }
-
   const store = {
-    load() { try { return JSON.parse(localStorage.getItem(auth.key('jern.chats'))) || []; } catch (e) { return []; } },
-    save(chats) { localStorage.setItem(auth.key('jern.chats'), JSON.stringify(chats.slice(0, 50))); },
+    load() { try { return JSON.parse(localStorage.getItem('jern.chats')) || []; } catch (e) { return []; } },
+    save(chats) { localStorage.setItem('jern.chats', JSON.stringify(chats.slice(0, 50))); },
   };
 
   function persist() {
@@ -387,7 +337,7 @@
     current = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     session = null;
     document.getElementById('title').textContent = 'New chat';
-    localStorage.setItem(auth.key('jern.current'), current);
+    localStorage.setItem('jern.current', current);
     renderChats();
     openSidebar(false);
     input.focus();
@@ -402,7 +352,7 @@
     chat.innerHTML = record.html;
     chat.querySelectorAll('.actions, .typing').forEach((node) => node.remove());
     document.getElementById('title').textContent = record.title;
-    localStorage.setItem(auth.key('jern.current'), current);
+    localStorage.setItem('jern.current', current);
     renderChats();
     openSidebar(false);
     scroll();
@@ -411,7 +361,7 @@
 
   async function loadTools() {
     try {
-      const response = await api('/tools');
+      const response = await fetch('/tools');
       if (!response.ok) return;
       const list = document.getElementById('tools');
       list.replaceChildren();
@@ -445,82 +395,6 @@
   document.getElementById('about').onclick = () => { acknowledged.checked = localStorage.getItem('jern.about') === '1'; about.showModal(); };
   about.querySelector('form').addEventListener('submit', closeAbout);
   about.addEventListener('cancel', closeAbout);
-
-  const authDialog = document.getElementById('auth-dialog');
-  const authForm = document.getElementById('auth-form');
-  const authError = document.getElementById('auth-error');
-  let registering = false;
-
-  function renderAccount() {
-    document.getElementById('account').hidden = !(auth.enabled && auth.user);
-    if (auth.user) {
-      document.getElementById('username').textContent = auth.user.username;
-      document.getElementById('avatar').textContent = auth.user.username.slice(0, 1);
-    }
-  }
-
-  function setMode(register) {
-    registering = register;
-    document.getElementById('auth-title').textContent = register ? 'Create your Ishvarax account' : 'Sign in to JERN';
-    document.getElementById('auth-hint').textContent = register ? 'Pick a username and a password of at least 8 characters.' : 'Use your Ishvarax account.';
-    document.getElementById('auth-user-label').textContent = register ? 'Username' : 'Username or email';
-    document.getElementById('auth-email-field').hidden = !register;
-    document.getElementById('auth-email').required = register;
-    document.getElementById('auth-password').autocomplete = register ? 'new-password' : 'current-password';
-    document.getElementById('auth-switch').textContent = register ? 'I already have an account' : 'Create an account';
-    document.getElementById('auth-submit').textContent = register ? 'Create account' : 'Sign in';
-    authError.hidden = true;
-  }
-
-  function showAuth() {
-    if (authDialog.open) return;
-    setMode(false);
-    authForm.reset();
-    authDialog.showModal();
-  }
-
-  authDialog.addEventListener('cancel', (event) => { if (auth.enabled && !auth.user) event.preventDefault(); });
-  document.getElementById('auth-switch').onclick = () => setMode(!registering);
-  document.getElementById('signout').onclick = () => { auth.set(null, null); resetView(); renderChats(); showAuth(); };
-
-  authForm.onsubmit = async (event) => {
-    event.preventDefault();
-    if (!authForm.reportValidity()) return;
-    const submit = document.getElementById('auth-submit');
-    const body = { username: document.getElementById('auth-user').value.trim(), password: document.getElementById('auth-password').value };
-    if (registering) body.email = document.getElementById('auth-email').value.trim();
-    submit.disabled = true;
-    authError.hidden = true;
-    try {
-      const response = await api(registering ? '/auth/register' : '/auth/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not sign in. Check your details and try again.');
-      auth.set(data.token, data.user);
-      authDialog.close();
-      start();
-    } catch (error) {
-      authError.textContent = error.message;
-      authError.hidden = false;
-    } finally {
-      submit.disabled = false;
-    }
-  };
-
-  async function checkAuth() {
-    try {
-      const response = await api('/auth/me');
-      if (!response.ok) return response.status !== 401;
-      const data = await response.json();
-      auth.enabled = data.enabled;
-      if (!data.enabled) auth.set(null, null);
-      else if (data.user && (!auth.user || auth.user.username !== data.user)) auth.set(auth.token, { ...(auth.user || {}), username: data.user });
-      return !data.enabled || !!data.user;
-    } catch (error) {
-      return true;
-    }
-  }
 
   function add(cls, text) {
     const node = el('div', 'msg ' + cls, text);
@@ -558,7 +432,7 @@
     return row;
   }
 
-  const VERBS = { search: 'Searched', download: 'Downloaded', fetch: 'Fetched', open: 'Opened', play: 'Played', show: 'Showed', get: 'Got' };
+  const VERBS = { search: 'Searched', get: 'Got' };
 
   function currentTimeline(before) {
     if (!timeline) {
@@ -653,7 +527,7 @@
     sendButton.disabled = true;
     const bubble = typing();
     try {
-      const response = await api(url, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -690,15 +564,10 @@
   };
   document.getElementById('new').onclick = newChat;
 
-  function start() {
-    renderAccount();
-    const last = localStorage.getItem(auth.key('jern.current'));
-    if (last && store.load().some((c) => c.id === last)) openChat(last); else newChat();
-    loadTools();
-    if (localStorage.getItem('jern.about') !== '1') about.showModal();
-  }
-
-  checkAuth().then((ok) => { if (ok) start(); else { renderAccount(); renderChats(); showAuth(); } });
+  const last = localStorage.getItem('jern.current');
+  if (last && store.load().some((c) => c.id === last)) openChat(last); else newChat();
+  loadTools();
+  if (localStorage.getItem('jern.about') !== '1') about.showModal();
 </script>
 </body>
 </html>

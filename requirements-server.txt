@@ -1,7 +1,0 @@
-# Chat server + web UI only (Render and other hosts): the model is reached through --model_url, so no torch here.
-saturday-ai @ git+https://github.com/vivek09thakur/SATURDAY.git
-fastapi
-uvicorn
-pydantic
-mcp
-requests

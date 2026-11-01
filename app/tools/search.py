@@ -42,7 +42,7 @@ class SearchWeb(Plugin):
 
     name = 'search_web'
     description = ('Search the web and return the top results with snippets. '
-                   'Use it to look up facts or to find the right shell command before running one.')
+                   'Use it to look up facts, recent events or things you are not sure about.')
     parameters = {'query': 'what to search for'}
     required = ('query',)
     URL = 'https://html.duckduckgo.com/html/'

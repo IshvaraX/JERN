@@ -40,7 +40,7 @@ Runs the assistant: web UI, HTTP API and tool plugins on this machine. Where the
 | `--web` | off | open the browser once the server is up |
 | `--local` | off | run the model here instead of on Colab |
 | `--model_url` | `''` | use a running model server; no model is loaded locally |
-| `--model_name` | `Qwen/Qwen2.5-1.5B-Instruct` | base model (any HF chat model) |
+| `--model_name` | `microsoft/Phi-3.5-mini-instruct` | base model (any HF chat model) |
 | `--backend` | `transformers` | or `gguf` for llama.cpp quantized models (CPU, inference only, always local) |
 | `--out_dir` | `out-jern` | where the LoRA adapter is saved / loaded from; `HF_REPO` in `.env` keeps it on the Hub |
 | `--train` | off | train the adapter again even if one exists |
@@ -49,9 +49,6 @@ Runs the assistant: web UI, HTTP API and tool plugins on this machine. Where the
 | `--temperature`, `--repetition_penalty`, `--max_new_tokens` | `0.3`, `1.15`, `300` | generation |
 | `--max_history` | `5` | user turns kept in context |
 | `--max_tool_calls`, `--max_tool_result` | `3`, `1500` | tool loop limits per turn |
-| `--workspace`, `--downloads` | `workspace`, `workspace/downloads` | where the download tool saves files (`[app]`) |
-| `--mcp` | `mcp.json` | MCP servers to expose as tools (see server.md); `''` disables (`[app]`) |
-| `--disabled_tools` | `''` | comma-separated tool names to leave out, e.g. `open_website,play_youtube,search_location` on a headless host (`[app]`) |
 | `--gpu`, `--session`, `--keep`, `--reuse` | `T4`, `jern`, off, off | Colab runtime (see colab.md) |
 | `--platform` | this machine | OS name baked into the tool prompt (Saturday sets it so a Linux VM fine-tunes for a Windows user) |
 | `--persona` | `[assistant] persona` | persona text |

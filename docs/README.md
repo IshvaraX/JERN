@@ -4,11 +4,11 @@ JERN is a small personal AI assistant by Vivek Thakur. It has two models and one
 
 | Part | What it is | Where |
 |---|---|---|
-| **Chat model** | `Qwen/Qwen2.5-1.5B-Instruct` fine-tuned on `data/chat/conversations.txt` so it answers as JERN and knows how to call tools | `model/jern/chat.py` |
+| **Chat model** | `microsoft/Phi-3.5-mini-instruct` fine-tuned on `data/chat/conversations.txt` so it answers as JERN and knows when to search or check the weather | Saturday (`saturday.models`), configured in `saturday.toml` |
 | **Char model** | A from-scratch GPT-style transformer trained character-by-character on the same file (an experiment, not the assistant) | `model/jern/network.py`, `train.py`, `sample.py` |
-| **App** | FastAPI server + web UI + tool plugins (web search, page reading, downloads, browser, weather) + any MCP servers you configure (Figma, GitHub, …) | `app/server/`, `app/tools/`, `app/ui/` |
+| **App** | FastAPI server + web UI + two tools (web search, weather) | `app/server/`, `app/tools/`, `app/ui/` |
 
-The model can run on this machine or on a Google Colab GPU; the tools **always run on this machine**, so JERN can read your files and run your commands even when the model is in the cloud.
+The model can run on this machine or on a Google Colab GPU; the UI and tools always run on this machine.
 
 ## Quick start
 
