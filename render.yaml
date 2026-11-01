@@ -1,0 +1,23 @@
+# Render Blueprint: the JERN chat server + web UI. The model runs elsewhere (MODEL_URL); see docs/server.md.
+services:
+  - type: web
+    name: jern
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-server.txt
+    startCommand: python main.py serve --host=0.0.0.0 --port=$PORT --mcp= --model_url=$MODEL_URL --disabled_tools=open_website,play_youtube,search_location
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: MODEL_URL
+        sync: false
+      - key: AUTH_URL
+        value: https://hfi-backend.vercel.app
+      - key: JERN_SECRET
+        generateValue: true
+      - key: JERN_PASSWORD
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false

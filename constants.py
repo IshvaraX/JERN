@@ -6,7 +6,6 @@ DATA_DIR = 'data'
 DATASET = 'chat'
 CONVERSATIONS_FILE = 'conversations.txt'
 CONVERSATIONS_PATH = f'{DATA_DIR}/{DATASET}/{CONVERSATIONS_FILE}'
-CONTACTS_PATH = f'{DATA_DIR}/contacts.json'
 USER_TAG = 'User: '
 ASSISTANT_TAG = f'{NAME}: '
 MIN_VAL_CHARS = 512
@@ -19,6 +18,11 @@ SEED = 1337
 
 MAX_SESSIONS = 1000
 USER_AGENT = f'Mozilla/5.0 {NAME}/1.0'
+PASSWORD_ENV = 'JERN_PASSWORD'
+AUTH_URL_ENV = 'AUTH_URL'            # Ishvarax backend (https://hfi-backend.vercel.app); empty = no sign-in
+AUTH_SECRET_ENV = 'JERN_SECRET'      # signs JERN session tokens; random per process when unset
+AUTH_TIMEOUT = 20
+SESSION_TTL = 30 * 24 * 3600
 UI_DIR = 'ui'
 INDEX_FILE = 'index.html'
 ICON_FILE = 'icon.svg'

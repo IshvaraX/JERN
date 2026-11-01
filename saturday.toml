@@ -36,6 +36,7 @@ registry = "app.tools:ToolCatalog"  # descriptions for the system prompt; main.p
 workspace = "workspace"          # where the download tool saves files
 downloads = "workspace/downloads"
 mcp = "mcp.json"                 # MCP servers config; "" disables
+disabled_tools = ""              # comma-separated tool names to leave out, e.g. browser tools on a headless host
 host = "127.0.0.1"
 port = 8000
 web = false                      # open the browser on start

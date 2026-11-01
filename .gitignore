@@ -1,6 +1,5 @@
 # secrets and personal data
 .env
-data/contacts.json
 
 # local MCP server checkouts, workspace sandbox, Colab staging, trained models
 mcp-servers/

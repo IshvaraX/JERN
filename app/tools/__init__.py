@@ -28,9 +28,10 @@ class ToolCatalog:
         from app.tools.mcp import mcp_tools
 
         self.config = config
-        self.classes = {cls.name: cls for cls in discover()}
+        disabled = {name.strip() for name in str(getattr(config, 'disabled_tools', '') or '').split(',') if name.strip()}
+        self.classes = {cls.name: cls for cls in discover() if cls.name not in disabled}
         self.mcp, external = mcp_tools(config.path(config.mcp) if config.mcp else '')
-        self.classes.update({cls.name: cls for cls in external})
+        self.classes.update({cls.name: cls for cls in external if cls.name not in disabled})
 
     def __iter__(self):
         return iter(self.classes.values())

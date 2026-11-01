@@ -16,6 +16,9 @@ Splitting them is what lets the model run on a Colab GPU while the tools keep ru
 | `POST` | `/chat` | `{"message": "...", "session_id": "..."?}` | `ChatResponse` |
 | `POST` | `/confirm` | `{"session_id", "action_id", "allow": bool}` | `ChatResponse` |
 | `GET` | `/tools` | | `[{name, description, confirm}]` |
+| `GET` | `/auth/me` | | `{enabled, user}` — whether sign-in is configured and who the bearer token belongs to |
+| `POST` | `/auth/login` | `{"username", "password"}` | `{token, user}` (username or email accepted) |
+| `POST` | `/auth/register` | `{"username", "email", "password"}` | `{token, user}` — registers, then signs in |
 | `GET` | `/health` | | `{"status": "ok"}` |
 | `GET` | `/docs` | | OpenAPI UI |
 
@@ -34,6 +37,12 @@ Splitting them is what lets the model run on a Colab GPU while the tools keep ru
 ```
 
 Sessions live in memory (`Session`: history, pending tool call, steps of the current turn), keyed by `session_id`; omit it to start a new one. The oldest session is evicted after `MAX_SESSIONS` (1000). The UI stores its own chat list in `localStorage` and replays `session_id`.
+
+Set `JERN_PASSWORD` (in `.env` or the environment) to require HTTP Basic auth (any username) on every route except `/health`. Always set it when the server is reachable from outside your machine.
+
+### User sign-in (Ishvarax account)
+
+Set `AUTH_URL` to the Ishvarax backend (`https://hfi-backend.vercel.app`) and the UI asks users to sign in with their Ishvarax account or create one before chatting. JERN forwards `/auth/login` and `/auth/register` to the backend's endpoints of the same name server-to-server (so no CORS changes are needed there), then issues its **own** HMAC-signed session token (`{username, exp}`, 30 days, signed with `JERN_SECRET`). `/chat`, `/confirm` and `/tools` then require `Authorization: Bearer <token>`; sessions are keyed by `(user, session_id)` so one user cannot resume another's. The backend's secret is never shared with JERN; if `JERN_SECRET` is unset a random key is generated per process and everyone signs in again after a restart. Leave `AUTH_URL` empty and the UI works without accounts, as before.
 
 ## ModelServer API (default port 8001)
 
@@ -62,7 +71,7 @@ Sessions live in memory (`Session`: history, pending tool call, steps of the cur
 
 Tools live in their own package, deliberately outside `app/server`, because they act on the user's machine: the browser, the downloads folder, the network. Two views of the package, both satisfying Saturday's registry protocol (`describe()`, `get(name)`, iteration):
 
-- **`ToolRegistry(config)`** — live instances (downloads sandbox, SMTP settings). Created only by `serve`, i.e. only on the user's machine.
+- **`ToolRegistry(config)`** — live instances (downloads sandbox). Created only by `serve`, i.e. only on the user's machine.
 - **`ToolCatalog(config)`** — the tool classes and their descriptions, nothing instantiated. `saturday.toml` names it as the registry (`[plugins] registry = "app.tools:ToolCatalog"`), so `model` and `finetune` — and the Colab VM — build the system prompt with the exact tool list without ever being able to run a tool.
 
 A tool is a class with class attributes and a `run` method; both views discover every `Plugin` subclass in the package automatically. `app.tools.base.Plugin` extends `saturday.plugins.Plugin` with the downloads sandbox and the UI flag.
@@ -100,9 +109,8 @@ Built-in tools:
 | `play_youtube` | | play the first YouTube match for a song or video |
 | `search_location` | | show a place on Google Maps |
 | `weather` | | current weather for a city (`OPENWEATHER_API_KEY` in `.env`) |
-| `send_email` | yes | email a contact from `data/contacts.json` over SMTP (`SMTP_*` in `.env`) |
 
-The last five were Saturday's automation and moved here when Saturday became a framework.
+The last four were Saturday's automation and moved here when Saturday became a framework.
 
 ## MCP servers as tools (`app/tools/mcp.py`)
 
@@ -147,3 +155,18 @@ With all five enabled and the shipped allowlists, JERN exposes 29 MCP tools plus
 ## Web UI (`app/ui/index.html`)
 
 A single HTML file served at `/`, styled with Tailwind CSS v4 (browser build from a CDN, so still no build step): light theme with one blue accent, design tokens in `@theme`, reusable component classes in `@layer components`; chat list in `localStorage`, markdown rendering, a keyboard-operable activity timeline for tool calls, inline approve/reject buttons, and a sidebar that becomes a drawer below 768 px. No build step; edit and reload.
+
+## Hosting on Render
+
+`render.yaml` at the repo root is a Render Blueprint for the **chat server only**: Render has no GPUs, so the model must run elsewhere and the service reaches it through `--model_url`. Tools run inside the Render container, which is why the blueprint disables the three browser tools (there is no browser to open) and MCP (its servers are local processes).
+
+1. Run a model server somewhere reachable over HTTPS: `python main.py model --local` on a GPU box, or a Colab session exposed through a tunnel (ngrok, Cloudflare Tunnel). It must answer `GET /health` and `POST /generate`.
+2. In Render: *New → Blueprint*, pick this repo. Fill in the environment variables it asks for:
+   - `MODEL_URL` — the model server's base URL (required; the service exits if it cannot reach it within two minutes).
+   - `AUTH_URL` — preset to the Ishvarax backend so visitors sign in with their Ishvarax account; `JERN_SECRET` is generated for you.
+   - `JERN_PASSWORD` — optional extra gate in front of everything (HTTP Basic).
+   - `OPENWEATHER_API_KEY` — only if you want `weather` there.
+3. Deploy. The build installs `requirements-server.txt` (no torch); the start command is
+   `python main.py serve --host=0.0.0.0 --port=$PORT --mcp= --model_url=$MODEL_URL --disabled_tools=open_website,play_youtube,search_location`.
+
+Downloads land on the container's ephemeral disk, so `download` is of limited use there; the free plan sleeps after 15 minutes idle and the first request afterwards takes about a minute.

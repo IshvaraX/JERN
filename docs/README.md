@@ -6,7 +6,7 @@ JERN is a small personal AI assistant by Vivek Thakur. It has two models and one
 |---|---|---|
 | **Chat model** | `Qwen/Qwen2.5-1.5B-Instruct` fine-tuned on `data/chat/conversations.txt` so it answers as JERN and knows how to call tools | `model/jern/chat.py` |
 | **Char model** | A from-scratch GPT-style transformer trained character-by-character on the same file (an experiment, not the assistant) | `model/jern/network.py`, `train.py`, `sample.py` |
-| **App** | FastAPI server + web UI + tool plugins (web search, page reading, downloads, browser, weather, email) + any MCP servers you configure (Figma, GitHub, …) | `app/server/`, `app/tools/`, `app/ui/` |
+| **App** | FastAPI server + web UI + tool plugins (web search, page reading, downloads, browser, weather) + any MCP servers you configure (Figma, GitHub, …) | `app/server/`, `app/tools/`, `app/ui/` |
 
 The model can run on this machine or on a Google Colab GPU; the tools **always run on this machine**, so JERN can read your files and run your commands even when the model is in the cloud.
 

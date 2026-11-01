@@ -1,6 +1,6 @@
 # JERN — Just An Experimental Response Network
 
-**A small personal assistant with a cloud-GPU brain and local hands.** The language model can run on a free Google Colab GPU, while the tools (web search, page reading, downloads, browser, YouTube, maps, weather, mail, MCP servers) always run on your own machine.
+**A small personal assistant with a cloud-GPU brain and local hands.** The language model can run on a free Google Colab GPU, while the tools (web search, page reading, downloads, browser, YouTube, maps, weather, MCP servers) always run on your own machine.
 
 JERN is built on [Saturday](https://github.com/vivek09thakur/SATURDAY), a framework for assistants on small language models: Saturday supplies the model backends, LoRA fine-tuning, the Colab flow and the tool-call loop; JERN adds the web UI, its tools and MCP integration.
 
@@ -16,14 +16,14 @@ JERN is a small personal AI assistant by Vivek Thakur. It has two models and one
 |---|---|---|
 | **Chat model** | `Qwen/Qwen2.5-1.5B-Instruct` with a LoRA adapter trained on `data/chat/conversations.txt`, so it answers as JERN and knows how to call tools | Saturday (`saturday.models`), configured in `saturday.toml` |
 | **Char model** | A from-scratch GPT-style transformer trained character-by-character on the same file (an experiment, not the assistant) | `model/jern/network.py`, `train.py`, `sample.py` |
-| **App** | FastAPI server + web UI + tool plugins (web search, page reading, downloads, browser, YouTube, maps, weather, email) + any MCP servers you configure | `app/server/`, `app/tools/`, `app/ui/` |
+| **App** | FastAPI server + web UI + tool plugins (web search, page reading, downloads, browser, YouTube, maps, weather) + any MCP servers you configure | `app/server/`, `app/tools/`, `app/ui/` |
 
 The model can run on this machine or on a Google Colab GPU; the tools **always run on this machine**, so JERN opens your browser and saves your downloads locally even when the model is in the cloud.
 
 ```mermaid
 flowchart LR
     UI["Web UI (browser)"] --> Chat["ChatServer<br/>your machine"]
-    Chat -->|"runs tools"| Tools["Web search · Browser · Downloads<br/>Weather · Mail · MCP servers"]
+    Chat -->|"runs tools"| Tools["Web search · Browser · Downloads<br/>Weather · MCP servers"]
     Tools -->|"tool results"| Chat
     Chat -->|"prompts + tool results<br/>via SSH tunnel"| Model["ModelServer /generate<br/>Colab T4 GPU"]
     Model -->|"reply or tool call"| Chat
@@ -54,13 +54,13 @@ data). Set `HF_REPO` to use a different repo. Any setting in `saturday.toml` can
 
 - The chat model is small (1.5B). It can choose the wrong tool, repeat phrases, or answer incorrectly.
 - Running on Colab depends on free-tier GPU availability and on the Colab CLI and tunnel working on your network.
-- Downloads and emails act for real. Review the approval question before accepting it.
+- Downloads act for real. Review the approval question before accepting it.
 
 ## Documents
 
 - [cli.md](docs/cli.md) — every `main.py` command and flag
 - [model.md](docs/model.md) — the two models, the data format, training and fine-tuning
-- [server.md](docs/server.md) — HTTP API, sessions, the tool-call protocol, writing a plugin
+- [server.md](docs/server.md) — HTTP API, sessions, the tool-call protocol, writing a plugin, hosting on Render
 - [colab.md](docs/colab.md) — running on Google Colab, the SSH tunnel, TLS behind a proxy
 
 ## Contributing
