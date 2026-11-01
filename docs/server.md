@@ -12,6 +12,7 @@ Splitting them is what lets the model run on a Colab GPU while the tools keep ru
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | `GET` | `/` | | the web UI |
+| `GET` | `/icon.svg` | | the logo (`app/ui/icon.svg`) |
 | `POST` | `/chat` | `{"message": "...", "session_id": "..."?}` | `ChatResponse` |
 | `POST` | `/confirm` | `{"session_id", "action_id", "allow": bool}` | `ChatResponse` |
 | `GET` | `/tools` | | `[{name, description, confirm}]` |

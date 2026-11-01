@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.server.assistant import Session
-from constants import INDEX_FILE, MAX_SESSIONS, UI_DIR
+from constants import ICON_FILE, INDEX_FILE, MAX_SESSIONS, UI_DIR
 from model.jern.util import wait_for_port
 
 
@@ -72,7 +72,7 @@ class Server:
 class ChatServer(Server):
 
     MAX_SESSIONS = MAX_SESSIONS
-    INDEX = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), UI_DIR, INDEX_FILE)
+    UI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), UI_DIR)
 
     def __init__(self, assistant, log):
         super().__init__(assistant.config.name)
@@ -80,6 +80,7 @@ class ChatServer(Server):
         self.log = log
         self.sessions = {}
         self.app.get('/', include_in_schema=False)(self.index)
+        self.app.get(f'/{ICON_FILE}', include_in_schema=False)(self.icon)
         self.app.post('/chat', response_model=ChatResponse)(self.chat)
         self.app.post('/confirm', response_model=ChatResponse)(self.confirm)
         self.app.get('/tools')(self.tools)
@@ -89,7 +90,10 @@ class ChatServer(Server):
                 f"{{\"message\": \"hello\"}}   {super().banner(host, port)}")
 
     def index(self):
-        return FileResponse(self.INDEX, media_type='text/html')
+        return FileResponse(os.path.join(self.UI, INDEX_FILE), media_type='text/html')
+
+    def icon(self):
+        return FileResponse(os.path.join(self.UI, ICON_FILE), media_type='image/svg+xml')
 
     def tools(self):
         return [{'name': p.name, 'description': p.description, 'confirm': p.confirm} for p in self.assistant.plugins]

@@ -21,6 +21,7 @@ MAX_SESSIONS = 1000
 USER_AGENT = f'Mozilla/5.0 {NAME}/1.0'
 UI_DIR = 'ui'
 INDEX_FILE = 'index.html'
+ICON_FILE = 'icon.svg'
 
 SITES = {
     'gmail': 'https://mail.google.com/mail/u/0/#inbox',
